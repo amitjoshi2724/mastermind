@@ -598,6 +598,7 @@
         };
 
         let pendingCred = null;
+        let isLoggedIn = false;
 
         googleLoginBtn.addEventListener('click', async () => {
             loginContainer.classList.remove('active');
@@ -681,6 +682,9 @@
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
+                if (isLoggedIn && auth.currentUser && auth.currentUser.uid === user.uid) return;
+                isLoggedIn = true;
+
                 // User is signed in.
                 userDisplayName.textContent = `Welcome, ${user.displayName}`;
                 userInfo.style.display = 'flex';
@@ -694,13 +698,21 @@
                     let dbData = {};
                     if (docSnap.exists()) {
                         dbData = docSnap.data();
-                        stats.wins += (dbData.wins || 0);
-                        stats.total += (dbData.total || 0);
-                        stats.currentStreak += (dbData.currentStreak || 0);
-                        stats.longestStreak = Math.max(stats.longestStreak, (dbData.longestStreak || 0));
                         
-                        syncStatsToFirebase();
+                        // Merge local guest progress ONLY if we just logged in and have unsaved progress
+                        // Otherwise, prioritize cloud stats to stay in sync
+                        if (stats.total > 0 && dbData.total === 0) {
+                            // First time syncing guest stats to new account
+                            syncStatsToFirebase();
+                        } else {
+                            // Prioritize cloud data
+                            stats.wins = (dbData.wins || 0);
+                            stats.total = (dbData.total || 0);
+                            stats.currentStreak = (dbData.currentStreak || 0);
+                            stats.longestStreak = (dbData.longestStreak || 0);
+                        }
                     } else {
+                        // Brand new account, upload current local stats
                         await setDoc(userRef, {
                             displayName: user.displayName,
                             email: user.email,
@@ -736,11 +748,12 @@
                 }
             } else {
                 // User is signed out.
+                isLoggedIn = false;
                 userInfo.style.display = 'none';
                 loginBtn.style.display = 'inline-block';
                 logoutBtn.style.display = 'none';
                 
-                // Reset guest stats
+                // Reset stats for guest session
                 stats = { wins: 0, total: 0, currentStreak: 0, longestStreak: 0 };
                 updateScoreboard();
             }
