@@ -9,4 +9,4 @@ I translated the game to javascript, still working on it but check out [https://
 
 # ☕ Support
 
-If you enjoy the game and want to support its development, you can support me here: [https://ko-fi.com/amitjoshi2724](https://ko-fi.com/amitjoshi2724)!
+If you enjoy the game and want to support its development, you can support me here: [https://ko-fi.com/amitjoshi2724](https://ko-fi.com/amitjoshi2724)! 
