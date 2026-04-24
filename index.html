@@ -339,7 +339,7 @@
             border: 0.1rem solid black;
             padding: 10px;
             z-index: 100;
-            min-width: 200px;
+            min-width: 300px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             border-radius: 4px;
         }
@@ -547,7 +547,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, GithubAuthProvider, signOut, onAuthStateChanged, fetchSignInMethodsForEmail, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, GithubAuthProvider, signOut, onAuthStateChanged, fetchSignInMethodsForEmail, linkWithCredential, getAdditionalUserInfo } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -605,7 +605,11 @@
                 const result = await signInWithPopup(auth, googleProvider);
                 if (pendingCred) {
                     try {
-                        await linkWithCredential(result.user, pendingCred);
+                        const linkResult = await linkWithCredential(result.user, pendingCred);
+                        const addInfo = getAdditionalUserInfo(linkResult);
+                        if (addInfo && addInfo.username) {
+                            await setDoc(doc(db, 'users', result.user.uid), { githubUsername: addInfo.username }, { merge: true });
+                        }
                         alert("Success! Your Google and GitHub accounts are now safely linked together.");
                     } catch (linkError) {
                         console.error("Failed to link accounts:", linkError);
@@ -623,7 +627,11 @@
         githubLoginBtn.addEventListener('click', async () => {
             loginContainer.classList.remove('active');
             try {
-                await signInWithPopup(auth, githubProvider);
+                const result = await signInWithPopup(auth, githubProvider);
+                const addInfo = getAdditionalUserInfo(result);
+                if (addInfo && addInfo.username) {
+                    await setDoc(doc(db, 'users', result.user.uid), { githubUsername: addInfo.username }, { merge: true });
+                }
             } catch (error) {
                 if (error.code === 'auth/account-exists-with-different-credential') {
                     pendingCred = GithubAuthProvider.credentialFromError(error);
@@ -631,7 +639,6 @@
                     
                     alert(`An account with ${email} already exists using Google.\n\nWe saved your GitHub authorization! Please click 'Sign in with Google' now to securely merge your accounts!`);
                     
-                    // Re-open the login menu to prompt them to click Google
                     loginContainer.classList.add('active');
                 } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
                     console.error("Error signing in with GitHub: ", error);
@@ -676,7 +683,6 @@
             if (user) {
                 // User is signed in.
                 userDisplayName.textContent = `Welcome, ${user.displayName}`;
-                identityList.textContent = user.email;
                 userInfo.style.display = 'flex';
                 loginBtn.style.display = 'none';
                 logoutBtn.style.display = 'inline-block';
@@ -685,12 +691,13 @@
                 
                 try {
                     const docSnap = await getDoc(userRef);
+                    let dbData = {};
                     if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        stats.wins += (data.wins || 0);
-                        stats.total += (data.total || 0);
-                        stats.currentStreak += (data.currentStreak || 0);
-                        stats.longestStreak = Math.max(stats.longestStreak, (data.longestStreak || 0));
+                        dbData = docSnap.data();
+                        stats.wins += (dbData.wins || 0);
+                        stats.total += (dbData.total || 0);
+                        stats.currentStreak += (dbData.currentStreak || 0);
+                        stats.longestStreak = Math.max(stats.longestStreak, (dbData.longestStreak || 0));
                         
                         syncStatsToFirebase();
                     } else {
@@ -703,6 +710,25 @@
                             longestStreak: stats.longestStreak
                         });
                     }
+
+                    // Show linked providers with their identifiers
+                    identityList.innerHTML = user.providerData.map(p => {
+                        let label = '';
+                        let identifier = '';
+                        
+                        if (p.providerId === 'google.com') {
+                            label = 'Google';
+                            identifier = p.email || p.displayName || 'Linked';
+                        } else if (p.providerId === 'github.com') {
+                            label = 'GitHub';
+                            identifier = dbData.githubUsername || p.displayName || p.email || 'Linked';
+                        } else {
+                            label = p.providerId;
+                            identifier = p.email || p.displayName || 'Linked';
+                        }
+                        
+                        return `<div style="margin-bottom: 5px; white-space: nowrap;"><strong>${label}:</strong> ${identifier}</div>`;
+                    }).join('');
                     
                     updateScoreboard();
                 } catch (error) {
