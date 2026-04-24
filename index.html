@@ -328,6 +328,31 @@
                 width: 20%;
             }
         }
+
+        /* Dropdown Styles */
+        #identity-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #fff;
+            border: 0.1rem solid black;
+            padding: 10px;
+            z-index: 100;
+            min-width: 200px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+
+        #identity-dropdown.active {
+            display: block;
+        }
+
+        .identity-email {
+            font-size: clamp(0.7rem, 2vw, 0.9rem);
+            color: #333;
+            word-break: break-all;
+        }
     </style>
 </head>
 
@@ -373,7 +398,18 @@
         </div>
 
         <!-- Instructions Panel -->
-        <div id="instruction-panel">
+        <div id="instruction-panel" style="position: relative;">
+            <div id="auth-container" style="margin-bottom: 2vh; display: flex; justify-content: flex-end; align-items: center; gap: 10px;">
+                <div id="user-info" onclick="toggleIdentityDropdown()" style="display: none; font-size: clamp(0.7rem, 2.5vw, 1rem); color: #000; align-items: center; background: #eee; padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc; word-break: break-word; position: relative; cursor: pointer;">
+                    <span id="user-display-name"></span><span style="font-size: 0.8em; margin-left: 5px;">▼</span>
+                    <div id="identity-dropdown">
+                        <div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid black; padding-bottom: 5px;">Current Account</div>
+                        <div id="identity-list" class="identity-email"></div>
+                    </div>
+                </div>
+                <button id="login-btn" style="padding: 6px 12px; cursor: pointer; font-size: 0.9rem; background-color: #4285F4; color: white; border: 0.1rem solid black; border-radius: 4px;">Sign in</button>
+                <button id="logout-btn" style="padding: 6px 12px; cursor: pointer; font-size: 0.9rem; background-color: #db4437; color: white; border: 0.1rem solid black; border-radius: 4px; display: none;">Sign Out</button>
+            </div>
             <section
                 style="font-family: sans-serif; line-height: 1.3; font-size: 0.85rem; color: #333; max-width: 600px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
                 <h2 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 1.2rem;">How to Play Mastermind</h2>
@@ -422,6 +458,7 @@
                 <a href="https://github.com/amitjoshi2724" target="_blank"
                     style="color: #0366d6; text-decoration: none;">GitHub: @amitjoshi2724</a>
             </p>
+
             <div id="scoreboard">
                 <div>Wins: 0/0 (0.00%)</div>
                 <div>Current Streak: 0</div>
@@ -438,7 +475,52 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, linkWithPopup, signInWithCredential, deleteUser } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDnI0nEq0Km3GGWQDTwWYa7kbPLID3pYzU",
+            authDomain: "mastermind-amitjoshi2724.firebaseapp.com",
+            projectId: "mastermind-amitjoshi2724",
+            storageBucket: "mastermind-amitjoshi2724.firebasestorage.app",
+            messagingSenderId: "790815043624",
+            appId: "1:790815043624:web:66f0dc2d1d4dbda06bc51d",
+            measurementId: "G-JQP8CHKRGR"
+        };
+
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const userInfo = document.getElementById('user-info');
+        const userDisplayName = document.getElementById('user-display-name');
+        const identityDropdown = document.getElementById('identity-dropdown');
+        const identityList = document.getElementById('identity-list');
+
+        window.toggleIdentityDropdown = function() {
+            identityDropdown.classList.toggle('active');
+        };
+
+        window.onclick = function(event) {
+            if (!userInfo.contains(event.target) && identityDropdown.classList.contains('active')) {
+                identityDropdown.classList.remove('active');
+            }
+        };
+
+        loginBtn.addEventListener('click', () => {
+            signInWithPopup(auth, provider).catch((error) => console.error("Error signing in: ", error));
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).catch((error) => console.error("Error signing out: ", error));
+        });
+
         const colors = ['red', 'blue', 'rgb(10, 210, 10)', 'yellow', 'orange', 'magenta'];
         let secretCode = [];
         let currentGuess = [];
@@ -451,6 +533,70 @@
             currentStreak: 0,
             longestStreak: 0
         };
+
+        async function syncStatsToFirebase() {
+            if (auth.currentUser) {
+                const userRef = doc(db, 'users', auth.currentUser.uid);
+                try {
+                    await setDoc(userRef, {
+                        wins: stats.wins,
+                        total: stats.total,
+                        currentStreak: stats.currentStreak,
+                        longestStreak: stats.longestStreak
+                    }, { merge: true });
+                } catch (error) {
+                    console.error("Error saving stats: ", error);
+                }
+            }
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // User is signed in.
+                userDisplayName.textContent = `Welcome, ${user.displayName}`;
+                identityList.textContent = user.email;
+                userInfo.style.display = 'flex';
+                loginBtn.style.display = 'none';
+                logoutBtn.style.display = 'inline-block';
+
+                const userRef = doc(db, 'users', user.uid);
+                
+                try {
+                    const docSnap = await getDoc(userRef);
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        stats.wins += (data.wins || 0);
+                        stats.total += (data.total || 0);
+                        stats.currentStreak += (data.currentStreak || 0);
+                        stats.longestStreak = Math.max(stats.longestStreak, (data.longestStreak || 0));
+                        
+                        syncStatsToFirebase();
+                    } else {
+                        await setDoc(userRef, {
+                            displayName: user.displayName,
+                            email: user.email,
+                            wins: stats.wins,
+                            total: stats.total,
+                            currentStreak: stats.currentStreak,
+                            longestStreak: stats.longestStreak
+                        });
+                    }
+                    
+                    updateScoreboard();
+                } catch (error) {
+                    console.error("Error accessing Firestore: ", error);
+                }
+            } else {
+                // User is signed out.
+                userInfo.style.display = 'none';
+                loginBtn.style.display = 'inline-block';
+                logoutBtn.style.display = 'none';
+                
+                // Reset guest stats
+                stats = { wins: 0, total: 0, currentStreak: 0, longestStreak: 0 };
+                updateScoreboard();
+            }
+        });
 
         function initGame() {
             // Generate secret code
@@ -627,6 +773,7 @@
             stats.currentStreak++;
             stats.longestStreak = Math.max(stats.longestStreak, stats.currentStreak);
             updateScoreboard();
+            syncStatsToFirebase();
             revealAnswer();
             document.querySelector('#answer-row .sequence-label').textContent = 'Correct Sequence - You Win';
         }
@@ -637,6 +784,7 @@
             stats.total++;
             stats.currentStreak = 0;
             updateScoreboard();
+            syncStatsToFirebase();
             revealAnswer();
             document.querySelector('#answer-row .sequence-label').textContent = 'Correct Sequence - You Lose';
         }
@@ -676,6 +824,7 @@
         });
 
         // Initialize the game
+        window.initGame = initGame;
         initGame();
     </script>
 </body>
