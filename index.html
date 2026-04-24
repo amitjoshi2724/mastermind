@@ -548,7 +548,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, GithubAuthProvider, signOut, onAuthStateChanged, fetchSignInMethodsForEmail, linkWithCredential, getAdditionalUserInfo } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDnI0nEq0Km3GGWQDTwWYa7kbPLID3pYzU",
@@ -680,12 +680,19 @@
             }
         }
 
+        let unsubscribeUser = null;
+
         onAuthStateChanged(auth, async (user) => {
+            if (unsubscribeUser) {
+                unsubscribeUser();
+                unsubscribeUser = null;
+            }
+
             if (user) {
                 if (isLoggedIn && auth.currentUser && auth.currentUser.uid === user.uid) return;
                 isLoggedIn = true;
 
-                // User is signed in.
+                // Initial UI setup
                 userDisplayName.textContent = `Welcome, ${user.displayName}`;
                 userInfo.style.display = 'flex';
                 loginBtn.style.display = 'none';
@@ -693,37 +700,23 @@
 
                 const userRef = doc(db, 'users', user.uid);
                 
-                try {
-                    const docSnap = await getDoc(userRef);
+                // Set up real-time listener for user data
+                unsubscribeUser = onSnapshot(userRef, (docSnap) => {
                     let dbData = {};
                     if (docSnap.exists()) {
                         dbData = docSnap.data();
                         
-                        // Merge local guest progress ONLY if we just logged in and have unsaved progress
-                        // Otherwise, prioritize cloud stats to stay in sync
-                        if (stats.total > 0 && dbData.total === 0) {
-                            // First time syncing guest stats to new account
-                            syncStatsToFirebase();
-                        } else {
-                            // Prioritize cloud data
+                        // Sync stats to local if they've changed on server (only if local is 0 or less)
+                        if (stats.total === 0 && dbData.total > 0) {
                             stats.wins = (dbData.wins || 0);
                             stats.total = (dbData.total || 0);
                             stats.currentStreak = (dbData.currentStreak || 0);
                             stats.longestStreak = (dbData.longestStreak || 0);
+                            updateScoreboard();
                         }
-                    } else {
-                        // Brand new account, upload current local stats
-                        await setDoc(userRef, {
-                            displayName: user.displayName,
-                            email: user.email,
-                            wins: stats.wins,
-                            total: stats.total,
-                            currentStreak: stats.currentStreak,
-                            longestStreak: stats.longestStreak
-                        });
                     }
 
-                    // Show linked providers with their identifiers
+                    // Render (or update) identity list in real-time
                     identityList.innerHTML = user.providerData.map(p => {
                         let label = '';
                         let identifier = '';
@@ -741,10 +734,30 @@
                         
                         return `<div style="margin-bottom: 5px; white-space: nowrap;"><strong>${label}:</strong> ${identifier}</div>`;
                     }).join('');
-                    
-                    updateScoreboard();
+                }, (error) => {
+                    console.error("Error listening to user document:", error);
+                });
+
+                // Initial check and creation if missing
+                try {
+                    const snap = await getDoc(userRef);
+                    if (!snap.exists()) {
+                        await setDoc(userRef, {
+                            displayName: user.displayName,
+                            email: user.email,
+                            wins: stats.wins,
+                            total: stats.total,
+                            currentStreak: stats.currentStreak,
+                            longestStreak: stats.longestStreak
+                        });
+                    } else {
+                        const data = snap.data();
+                        if (stats.total > 0 && data.total === 0) {
+                            syncStatsToFirebase();
+                        }
+                    }
                 } catch (error) {
-                    console.error("Error accessing Firestore: ", error);
+                    console.error("Error during initial user sync:", error);
                 }
             } else {
                 // User is signed out.
