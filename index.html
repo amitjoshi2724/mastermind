@@ -339,7 +339,7 @@
             border: 0.1rem solid black;
             padding: 10px;
             z-index: 100;
-            min-width: 300px;
+            min-width: 200px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             border-radius: 4px;
         }
@@ -453,9 +453,9 @@
 
         <!-- Instructions Panel -->
         <div id="instruction-panel" style="position: relative;">
-            <div id="auth-container" style="margin-bottom: 2vh; display: flex; justify-content: flex-end; align-items: center; gap: 10px;">
-                <div id="user-info" onclick="toggleIdentityDropdown()" style="display: none; font-size: clamp(0.7rem, 2.5vw, 1rem); color: #000; align-items: center; background: #eee; padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc; word-break: break-word; position: relative; cursor: pointer;">
-                    <span id="user-display-name"></span><span style="font-size: 0.8em; margin-left: 5px;">▼</span>
+            <div id="auth-container" style="margin-bottom: 2vh; display: flex; justify-content: flex-end; align-items: center; gap: 10px; max-width: 100%;">
+                <div id="user-info" onclick="toggleIdentityDropdown()" style="display: none; font-size: clamp(0.55rem, 1.8vw, 1rem); color: #000; align-items: center; background: #eee; padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc; position: relative; cursor: pointer; max-width: 100%; word-wrap: break-word;">
+                    <span id="user-display-name" style="line-height: 1.1; display: inline-block;"></span><span style="font-size: 0.8em; margin-left: 5px; flex-shrink: 0;">▼</span>
                     <div id="identity-dropdown">
                         <div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid black; padding-bottom: 5px;">Current Account</div>
                         <div id="identity-list" class="identity-email"></div>
@@ -528,6 +528,15 @@
                 <a href="https://github.com/amitjoshi2724" target="_blank"
                     style="color: #0366d6; text-decoration: none;">GitHub: @amitjoshi2724</a>
             </p>
+            
+            <!-- Ko-fi Widget Container -->
+            <div id="kofi-widget-container" style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 10px;">
+                <script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script>
+                <script type='text/javascript'>
+                    try { kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'I2I81CDN0L'); } catch(e){}
+                    try { kofiwidget2.draw(); } catch(e){}
+                </script>
+            </div>
 
             <div id="scoreboard">
                 <div>Wins: 0/0 (0.00%)</div>
@@ -542,6 +551,7 @@
                     <span class="slider round"></span>
                 </label>
             </div>
+
         </div>
     </div>
 
