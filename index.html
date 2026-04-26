@@ -512,15 +512,13 @@
             </div>
             <section
                 style="font-family: sans-serif; line-height: 1.3; font-size: 0.85rem; color: #333; max-width: 600px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
-                <h2 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 1.2rem;">How to Play Mastermind</h2>
-                <p style="margin: 0 0 10px 0;">Welcome to Mastermind! Your goal is to crack a secret color sequence code
-                    in
-                    ten attempts or less.</p>
-
+                <h2 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 1.2rem;">Welcome to Mastermind!</h2>
+                <p style="margin: 0 0 10px 0;">Crack the secret code in ten attempts or less.</p>
                 <ul style="padding-left: 20px; margin: 0 0 10px 0;">
-                    <li style="margin-bottom: 3px;"><strong>The Code:</strong> A sequence of colors is generated at the
+                    <li style="margin-bottom: 3px;"><strong>The Secret Code:</strong> A hidden sequence of 4 colors is
+                        generated at the
                         start. Colors
-                        <strong>can</strong> be repeated within the code.
+                        <strong>can</strong> be repeated within the code, with 6 colors to choose from.
                     </li>
                     <li style="margin-bottom: 3px;"><strong>Feedback System:</strong> After each guess, you will receive
                         pegs to help you narrow
@@ -546,29 +544,28 @@
                     <li style="margin-bottom: 4px;"><strong>Submit:</strong> When satisfied with your guess,
                         click <strong>Check</strong> to lock it in and get feedback.
                     </li>
-                    <li style="margin-bottom: 4px;"><strong>Analyze &amp; Repeat:</strong> Use the feedback pegs
-                        to inform your next move. You win if you guess the exact sequence within ten tries!</li>
+                    <li style="margin-bottom: 4px;"><strong>Analyze &amp; Repeat:</strong> Use the feedback
+                        to narrow down the code. Guess the sequence within 10 tries to win!</li>
                 </ol>
             </section>
 
-            <p style="margin: 10px 0; font-size: 0.85rem; color: #555;">
-                Developed by <strong>Amit Joshi</strong> •
-                <a href="https://github.com/amitjoshi2724" target="_blank"
-                    style="color: #0366d6; text-decoration: none;">GitHub: @amitjoshi2724</a>
-            </p>
-
-            <!-- Ko-fi Widget Container -->
-            <div id="kofi-widget-container"
-                style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px; min-height: 40px;">
-                <script src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script>
-                <script>
-                    try {
-                        kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'I2I81CDN0L');
-                        kofiwidget2.draw();
-                    } catch (e) {
-                        console.error('Ko-fi widget error:', e);
-                    }
-                </script>
+            <div style="margin: 15px 0 10px 0; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 0.85rem; color: #555;">Developed by <strong>Amit Joshi</strong></span>
+                    <a href="https://github.com/amitjoshi2724" target="_blank"
+                        style="color: #0366d6; text-decoration: none; font-size: 0.8rem;">GitHub: @amitjoshi2724</a>
+                </div>
+                <div id="kofi-widget-container" style="display: flex; align-items: center;">
+                    <script src="https://storage.ko-fi.com/cdn/widget/Widget_2.js"></script>
+                    <script>
+                        try {
+                            kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'I2I81CDN0L');
+                            kofiwidget2.draw();
+                        } catch (e) {
+                            console.error('Ko-fi widget error:', e);
+                        }
+                    </script>
+                </div>
             </div>
 
             <div id="scoreboard">
