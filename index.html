@@ -933,16 +933,22 @@
             const currentRowElement = document.getElementsByClassName('game-row')[1 + (maxRows - 1 - currentRow)];
             const pegs = currentRowElement.querySelector('.feedback').children;
 
+            // Bulletproof against Dark Reader using raw 1x1 PNG data URIs
+            const whitePng = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=")';
+            const blackPng = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")';
+            
             let pegIndex = 0;
             feedback.white.forEach(() => {
                 const peg = pegs[pegIndex++];
                 peg.style.backgroundColor = 'white';
-                peg.style.backgroundImage = 'linear-gradient(white, white)';
+                peg.style.backgroundImage = whitePng;
+                peg.style.backgroundSize = 'cover';
             });
             feedback.black.forEach(() => {
                 const peg = pegs[pegIndex++];
                 peg.style.backgroundColor = 'black';
-                peg.style.backgroundImage = 'linear-gradient(black, black)';
+                peg.style.backgroundImage = blackPng;
+                peg.style.backgroundSize = 'cover';
             });
 
             if (feedback.white.length === 4) {
