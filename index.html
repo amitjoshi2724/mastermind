@@ -935,10 +935,14 @@
 
             let pegIndex = 0;
             feedback.white.forEach(() => {
-                pegs[pegIndex++].style.backgroundColor = 'white';
+                const peg = pegs[pegIndex++];
+                peg.style.backgroundColor = 'white';
+                peg.style.backgroundImage = 'linear-gradient(white, white)';
             });
             feedback.black.forEach(() => {
-                pegs[pegIndex++].style.backgroundColor = 'black';
+                const peg = pegs[pegIndex++];
+                peg.style.backgroundColor = 'black';
+                peg.style.backgroundImage = 'linear-gradient(black, black)';
             });
 
             if (feedback.white.length === 4) {
