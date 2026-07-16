@@ -722,6 +722,26 @@
 
         let unsubscribeUser = null;
 
+        function renderIdentityList(user, dbData = {}) {
+            identityList.innerHTML = user.providerData.map(p => {
+                let label = '';
+                let identifier = '';
+
+                if (p.providerId === 'google.com') {
+                    label = 'Google';
+                    identifier = p.email || p.displayName || 'Linked';
+                } else if (p.providerId === 'github.com') {
+                    label = 'GitHub';
+                    identifier = dbData.githubUsername || p.displayName || p.email || 'Linked';
+                } else {
+                    label = p.providerId;
+                    identifier = p.email || p.displayName || 'Linked';
+                }
+
+                return `<div style="margin-bottom: 5px; white-space: nowrap;"><strong>${label}:</strong> ${identifier}</div>`;
+            }).join('');
+        }
+
         onAuthStateChanged(auth, async (user) => {
             if (unsubscribeUser) {
                 unsubscribeUser();
@@ -737,6 +757,7 @@
                 userInfo.style.display = 'flex';
                 loginBtn.style.display = 'none';
                 logoutBtn.style.display = 'inline-block';
+                renderIdentityList(user);
 
                 const userRef = doc(db, 'users', user.uid);
 
@@ -756,26 +777,9 @@
                         }
                     }
 
-                    // Render (or update) identity list in real-time
-                    identityList.innerHTML = user.providerData.map(p => {
-                        let label = '';
-                        let identifier = '';
-
-                        if (p.providerId === 'google.com') {
-                            label = 'Google';
-                            identifier = p.email || p.displayName || 'Linked';
-                        } else if (p.providerId === 'github.com') {
-                            label = 'GitHub';
-                            identifier = dbData.githubUsername || p.displayName || p.email || 'Linked';
-                        } else {
-                            label = p.providerId;
-                            identifier = p.email || p.displayName || 'Linked';
-                        }
-
-                        return `<div style="margin-bottom: 5px; white-space: nowrap;"><strong>${label}:</strong> ${identifier}</div>`;
-                    }).join('');
+                    renderIdentityList(user, dbData);
                 }, (error) => {
-                    console.error("Error listening to user document:", error);
+                    console.error("Error listening to user document (check Firestore security rules):", error);
                 });
 
                 // Initial check and creation if missing
@@ -797,7 +801,7 @@
                         }
                     }
                 } catch (error) {
-                    console.error("Error during initial user sync:", error);
+                    console.error("Error during initial user sync (check Firestore security rules in Firebase Console):", error);
                 }
             } else {
                 // User is signed out.
