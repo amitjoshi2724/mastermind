@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Storage Debug — Mastermindle</title>
+<meta charset="utf-8">
+<style>
+body { font-family: monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+h2 { color: #7eb8f7; }
+pre { background: #0f0f23; border: 1px solid #444; padding: 16px; border-radius: 8px; overflow: auto; white-space: pre-wrap; }
+button { background: #4a90e2; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin: 6px 4px; font-size: 14px; }
+button:hover { background: #357abd; }
+.danger { background: #c0392b; }
+.danger:hover { background: #a93226; }
+.success { color: #2ecc71; }
+.error { color: #e74c3c; }
+#output { margin-top: 20px; }
+</style>
+</head>
+<body>
+<h2>🔧 Mastermindle Storage Debugger</h2>
+<p>Open DevTools console (Cmd+Option+J) for live logs too.</p>
+
+<button onclick="dumpAll()">📦 Dump All localStorage Keys</button>
+<button onclick="dumpFirestore()">☁️ Check Firestore Data</button>
+<button onclick="forcePush()">⬆️ Force Push Local → Firestore</button>
+<button class="danger" onclick="clearLegacy()">🗑️ Clear Legacy (unscoped) Keys</button>
+<button class="danger" onclick="clearAll()">⚠️ Nuclear Clear ALL mastermind keys</button>
+
+<div id="output"></div>
+
+<script type="module">
+import { db } from '/js/firebase-config.js';
+import { onAuthChange, getCurrentUser } from '/js/auth.js';
+import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const out = document.getElementById('output');
+function log(html) { out.innerHTML += '<pre>' + html + '</pre>'; }
+function cls() { out.innerHTML = ''; }
+
+window.dumpAll = function() {
+    cls();
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('mastermind'));
+    if (!keys.length) { log('<span class="error">No mastermind keys in localStorage!</span>'); return; }
+    keys.forEach(k => {
+        try {
+            const val = JSON.parse(localStorage.getItem(k));
+            log('<span class="success">' + k + '</span>\n' + JSON.stringify(val, null, 2));
+        } catch(e) {
+            log(k + ' = ' + localStorage.getItem(k));
+        }
+    });
+};
+
+window.dumpFirestore = async function() {
+    cls();
+    const user = getCurrentUser();
+    if (!user) { log('<span class="error">Not signed in! Sign in first.</span>'); return; }
+    log('Signed in as: ' + user.email + ' (' + user.uid + ')');
+    try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        if (snap.exists()) {
+            log('<span class="success">✅ Firestore document found!</span>\n' + JSON.stringify(snap.data(), null, 2));
+        } else {
+            log('<span class="error">❌ No Firestore document for this user! Firestore is empty.</span>');
+        }
+    } catch(e) {
+        log('<span class="error">Firestore error: ' + e.message + '</span>');
+    }
+};
+
+window.forcePush = async function() {
+    cls();
+    const user = getCurrentUser();
+    if (!user) { log('<span class="error">Not signed in!</span>'); return; }
+
+    // Collect all scoped keys for this user
+    const uid = user.uid;
+    function get(key, def) {
+        try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e) { return def; }
+    }
+    const classicStats = get('mastermind_user_' + uid + '_classic_stats', get('mastermind_classic_stats', {wins:0,total:0,currentStreak:0,longestStreak:0}));
+    const dailyStats = get('mastermind_user_' + uid + '_daily_stats', {played:0,won:0,currentStreak:0,maxStreak:0,guessDistribution:{}});
+    
+    // Union all history sources
+    const scopedHistory = get('mastermind_user_' + uid + '_daily_history', {});
+    const guestHistory = get('mastermind_guest_daily_history', {});
+    const legacyHistory = get('mastermind_daily_history', {});
+    const dailyHistory = { ...legacyHistory, ...guestHistory, ...scopedHistory };
+    
+    // Recompute guess distribution
+    const dist = {1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0};
+    let wonCount = 0;
+    Object.values(dailyHistory).forEach(p => {
+        if (p && p.won) { wonCount++; if (p.attempts >= 1 && p.attempts <= 10) dist[p.attempts]++; }
+    });
+    dailyStats.guessDistribution = dist;
+    dailyStats.won = Math.max(dailyStats.won, wonCount);
+    dailyStats.played = Math.max(dailyStats.played, Object.keys(dailyHistory).length);
+
+    // Serialize nested arrays (Firestore doesn't support array-of-arrays)
+    function serializeHistory(history) {
+        const out = {};
+        for (const [date, result] of Object.entries(history || {})) {
+            if (!result) continue;
+            out[date] = { ...result, guesses: (result.guesses || []).map(row => Array.isArray(row) ? row.join(',') : row) };
+        }
+        return out;
+    }
+
+    const payload = {
+        displayName: user.displayName || '',
+        email: user.email || '',
+        classicStats, dailyStats,
+        dailyHistory: serializeHistory(dailyHistory),
+        dailyInProgress: {},
+        wins: classicStats.wins,
+        total: classicStats.total,
+        currentStreak: classicStats.currentStreak,
+        longestStreak: classicStats.longestStreak,
+        lastSyncedAt: Date.now()
+    };
+
+
+    log('About to push:\n' + JSON.stringify(payload, null, 2));
+    try {
+        await setDoc(doc(db, 'users', uid), payload, { merge: true });
+        log('<span class="success">✅ Successfully pushed to Firestore! Now check on your phone.</span>');
+    } catch(e) {
+        log('<span class="error">❌ Push failed: ' + e.message + '</span>');
+    }
+};
+
+window.clearLegacy = function() {
+    const keys = ['mastermind_daily_history','mastermind_daily_stats','mastermind_classic_stats','mastermind_daily_in_progress'];
+    keys.forEach(k => localStorage.removeItem(k));
+    log('<span class="success">Cleared ' + keys.join(', ') + '</span>');
+};
+
+window.clearAll = function() {
+    if (!confirm('Delete ALL mastermind localStorage data? This is irreversible!')) return;
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('mastermind'));
+    keys.forEach(k => localStorage.removeItem(k));
+    log('<span class="success">Cleared ' + keys.length + ' mastermind keys</span>');
+};
+
+// Show auth state on load
+onAuthChange(user => {
+    document.querySelector('h2').innerHTML = '🔧 Mastermindle Storage Debugger — ' +
+        (user ? '<span class="success">Signed in as ' + user.email + '</span>' : '<span class="error">Not signed in</span>');
+});
+</script>
+</body>
+</html>

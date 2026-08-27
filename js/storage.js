@@ -254,7 +254,9 @@ function mergeCloudData(cloud, uid = currentSyncedUid) {
     }
 
     // 2. Merge Daily History (Union of all dates from cloud + local)
-    dailyHistory = { ...(cloud.dailyHistory || {}), ...dailyHistory };
+    // Deserialize Firestore guess strings back to arrays
+    const cloudHistory = deserializeDailyHistory(cloud.dailyHistory || {});
+    dailyHistory = { ...cloudHistory, ...dailyHistory };
 
     // 3. Recalculate Daily Stats and Guess Distribution from complete history
     dailyStats = recalculateDailyStatsFromHistory(dailyHistory, {
@@ -266,11 +268,75 @@ function mergeCloudData(cloud, uid = currentSyncedUid) {
 
     // 4. In-progress state
     if (cloud.dailyInProgress && Object.keys(cloud.dailyInProgress).length > 0) {
-        dailyInProgress = { ...cloud.dailyInProgress, ...dailyInProgress };
+        const cloudInProgress = deserializeInProgress(cloud.dailyInProgress);
+        dailyInProgress = { ...cloudInProgress, ...dailyInProgress };
     }
 
     saveUserLocalState(uid);
     notifyListeners();
+}
+
+/**
+ * Firestore does NOT support nested arrays (e.g. guesses: [[1,2,3,4], ...]).
+ * Serialize each guess row to a comma-separated string before writing.
+ */
+function serializeDailyHistory(history) {
+    const out = {};
+    for (const [date, result] of Object.entries(history || {})) {
+        if (!result) continue;
+        out[date] = {
+            ...result,
+            guesses: (result.guesses || []).map(row =>
+                Array.isArray(row) ? row.join(',') : row
+            )
+        };
+    }
+    return out;
+}
+
+/**
+ * Deserialize guess rows back from strings to number arrays after reading from Firestore.
+ */
+function deserializeDailyHistory(history) {
+    const out = {};
+    for (const [date, result] of Object.entries(history || {})) {
+        if (!result) continue;
+        out[date] = {
+            ...result,
+            guesses: (result.guesses || []).map(row =>
+                typeof row === 'string' ? row.split(',').map(Number) : row
+            )
+        };
+    }
+    return out;
+}
+
+function serializeInProgress(inProgress) {
+    const out = {};
+    for (const [date, state] of Object.entries(inProgress || {})) {
+        if (!state) continue;
+        out[date] = {
+            ...state,
+            guesses: (state.guesses || []).map(row =>
+                Array.isArray(row) ? row.join(',') : row
+            )
+        };
+    }
+    return out;
+}
+
+function deserializeInProgress(inProgress) {
+    const out = {};
+    for (const [date, state] of Object.entries(inProgress || {})) {
+        if (!state) continue;
+        out[date] = {
+            ...state,
+            guesses: (state.guesses || []).map(row =>
+                typeof row === 'string' ? row.split(',').map(Number) : row
+            )
+        };
+    }
+    return out;
 }
 
 async function syncAllToFirestore() {
@@ -288,8 +354,8 @@ async function syncAllToFirestore() {
             longestStreak: classicStats.longestStreak,
             classicStats,
             dailyStats,
-            dailyHistory,
-            dailyInProgress,
+            dailyHistory: serializeDailyHistory(dailyHistory),
+            dailyInProgress: serializeInProgress(dailyInProgress),
             lastSyncedAt: Date.now()
         };
         await setDoc(userRef, payload, { merge: true });
