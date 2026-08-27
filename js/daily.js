@@ -126,13 +126,15 @@ export function initDailyMode() {
     // Start live countdown timer
     startCountdownTimer();
 
-    // Storage change listener
+    // Storage & Auth change listener
     onStorageChange(() => {
         updateStatsModalContent();
         renderArchiveList();
+        renderCalendarView();
+        loadDailyPuzzle(activeDateStr);
     });
 
-    // Load active puzzle
+    // Initial load active puzzle
     loadDailyPuzzle(activeDateStr);
 }
 

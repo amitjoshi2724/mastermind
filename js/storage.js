@@ -1,42 +1,45 @@
 /**
  * Storage Layer: LocalStorage + Firebase Firestore Dual Sync
  * Ensures offline play for guests and real-time cloud synchronization for authenticated users.
+ * Supports multi-account switching with clean user isolation.
  */
 import { db } from './firebase-config.js';
 import { onAuthChange, getCurrentUser } from './auth.js';
 import { doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-const STORAGE_KEYS = {
-    CLASSIC_STATS: 'mastermind_classic_stats',
-    DAILY_STATS: 'mastermind_daily_stats',
-    DAILY_HISTORY: 'mastermind_daily_history',
-    DAILY_IN_PROGRESS: 'mastermind_daily_in_progress',
-    SETTINGS: 'mastermind_settings'
-};
+function getDefaultClassicStats() {
+    return {
+        wins: 0,
+        total: 0,
+        currentStreak: 0,
+        longestStreak: 0
+    };
+}
+
+function getDefaultDailyStats() {
+    return {
+        played: 0,
+        won: 0,
+        currentStreak: 0,
+        maxStreak: 0,
+        guessDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+    };
+}
 
 // In-memory state cache
-let classicStats = loadFromLocal(STORAGE_KEYS.CLASSIC_STATS, {
-    wins: 0,
-    total: 0,
-    currentStreak: 0,
-    longestStreak: 0
-});
-
-let dailyStats = loadFromLocal(STORAGE_KEYS.DAILY_STATS, {
-    played: 0,
-    won: 0,
-    currentStreak: 0,
-    maxStreak: 0,
-    guessDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
-});
-
-let dailyHistory = loadFromLocal(STORAGE_KEYS.DAILY_HISTORY, {});
-let dailyInProgress = loadFromLocal(STORAGE_KEYS.DAILY_IN_PROGRESS, {});
-let settings = loadFromLocal(STORAGE_KEYS.SETTINGS, { showNumbers: true });
+let classicStats = getDefaultClassicStats();
+let dailyStats = getDefaultDailyStats();
+let dailyHistory = {};
+let dailyInProgress = {};
+let settings = { showNumbers: true };
 
 const listeners = new Set();
 let unsubscribeFirestore = null;
 let currentSyncedUid = null;
+
+function getScopedKey(key, uid = currentSyncedUid) {
+    return uid ? `mastermind_user_${uid}_${key}` : `mastermind_guest_${key}`;
+}
 
 function loadFromLocal(key, defaultVal) {
     try {
@@ -67,6 +70,31 @@ function notifyListeners() {
 }
 
 /**
+ * Load local storage data for a specific user ID (or guest if null)
+ */
+function loadUserLocalState(uid) {
+    classicStats = loadFromLocal(getScopedKey('classic_stats', uid), getDefaultClassicStats());
+    dailyStats = loadFromLocal(getScopedKey('daily_stats', uid), getDefaultDailyStats());
+    dailyHistory = loadFromLocal(getScopedKey('daily_history', uid), {});
+    dailyInProgress = loadFromLocal(getScopedKey('daily_in_progress', uid), {});
+    settings = loadFromLocal('mastermind_settings', { showNumbers: true });
+}
+
+/**
+ * Save current memory state to local storage for current user ID
+ */
+function saveUserLocalState(uid = currentSyncedUid) {
+    saveToLocal(getScopedKey('classic_stats', uid), classicStats);
+    saveToLocal(getScopedKey('daily_stats', uid), dailyStats);
+    saveToLocal(getScopedKey('daily_history', uid), dailyHistory);
+    saveToLocal(getScopedKey('daily_in_progress', uid), dailyInProgress);
+    saveToLocal('mastermind_settings', settings);
+}
+
+// Initialize guest state on startup
+loadUserLocalState(null);
+
+/**
  * Subscribe to storage updates (local or cloud)
  */
 export function onStorageChange(callback) {
@@ -75,97 +103,97 @@ export function onStorageChange(callback) {
     return () => listeners.delete(callback);
 }
 
-// Set up Firebase Auth sync listener
+// Set up Firebase Auth sync listener with clean account switching
 onAuthChange(async (user) => {
-    if (user) {
-        if (currentSyncedUid === user.uid) return;
-        currentSyncedUid = user.uid;
+    if (unsubscribeFirestore) {
+        unsubscribeFirestore();
+        unsubscribeFirestore = null;
+    }
 
-        if (unsubscribeFirestore) {
-            unsubscribeFirestore();
-            unsubscribeFirestore = null;
-        }
+    if (user) {
+        currentSyncedUid = user.uid;
+        console.log(`[Auth/Storage] Switched to user: ${user.displayName || user.email} (${user.uid})`);
+
+        // Load this user's local cache first
+        loadUserLocalState(user.uid);
+        notifyListeners();
 
         const userRef = doc(db, 'users', user.uid);
 
-        // Listen for real-time changes
-        unsubscribeFirestore = onSnapshot(userRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                mergeCloudData(data);
-            }
-        }, (error) => {
-            console.warn("Firestore snapshot listener notice (check firestore.rules):", error.message);
-        });
-
-        // Initial fetch and merge
+        // Fetch from Firestore
         try {
             const snap = await getDoc(userRef);
             if (snap.exists()) {
-                mergeCloudData(snap.data());
+                const cloudData = snap.data();
+                console.log(`[Firestore] Loaded cloud profile for ${user.uid}:`, cloudData);
+                applyCloudData(cloudData, user.uid);
             } else {
-                // First-time user document creation: upload local progress
+                console.log(`[Firestore] New user document created for ${user.uid}`);
                 await syncAllToFirestore();
             }
         } catch (error) {
-            console.warn("Firestore initial sync notice:", error.message);
+            console.error("[Firestore] Error fetching user data:", error);
+            if (error.code === 'permission-denied') {
+                console.warn("Firestore permission denied. Check that Firestore Security Rules allow read/write for request.auth.uid == userId.");
+            }
         }
+
+        // Attach real-time snapshot listener
+        unsubscribeFirestore = onSnapshot(userRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                applyCloudData(data, user.uid);
+            }
+        }, (error) => {
+            console.warn("[Firestore] Snapshot listener notice:", error.message);
+        });
+
     } else {
+        console.log("[Auth/Storage] Signed out — switched back to guest context.");
         currentSyncedUid = null;
-        if (unsubscribeFirestore) {
-            unsubscribeFirestore();
-            unsubscribeFirestore = null;
-        }
+        loadUserLocalState(null);
         notifyListeners();
     }
 });
 
-function mergeCloudData(cloud) {
+function applyCloudData(cloud, uid = currentSyncedUid) {
     if (!cloud) return;
 
     // Classic Stats
-    if (cloud.classicStats || cloud.total !== undefined) {
-        const c = cloud.classicStats || {
+    if (cloud.classicStats) {
+        classicStats = { ...getDefaultClassicStats(), ...cloud.classicStats };
+    } else if (cloud.total !== undefined) {
+        classicStats = {
             wins: cloud.wins || 0,
             total: cloud.total || 0,
             currentStreak: cloud.currentStreak || 0,
             longestStreak: cloud.longestStreak || 0
         };
-        // Merge max
-        classicStats = {
-            wins: Math.max(classicStats.wins, c.wins || 0),
-            total: Math.max(classicStats.total, c.total || 0),
-            currentStreak: Math.max(classicStats.currentStreak, c.currentStreak || 0),
-            longestStreak: Math.max(classicStats.longestStreak, c.longestStreak || 0)
-        };
-        saveToLocal(STORAGE_KEYS.CLASSIC_STATS, classicStats);
     }
 
     // Daily Stats
     if (cloud.dailyStats) {
-        const d = cloud.dailyStats;
-        const mergedDistribution = { ...dailyStats.guessDistribution };
-        if (d.guessDistribution) {
-            for (let i = 1; i <= 10; i++) {
-                mergedDistribution[i] = Math.max(mergedDistribution[i] || 0, d.guessDistribution[i] || 0);
-            }
-        }
         dailyStats = {
-            played: Math.max(dailyStats.played, d.played || 0),
-            won: Math.max(dailyStats.won, d.won || 0),
-            currentStreak: Math.max(dailyStats.currentStreak, d.currentStreak || 0),
-            maxStreak: Math.max(dailyStats.maxStreak, d.maxStreak || 0),
-            guessDistribution: mergedDistribution
+            ...getDefaultDailyStats(),
+            ...cloud.dailyStats,
+            guessDistribution: {
+                ...getDefaultDailyStats().guessDistribution,
+                ...(cloud.dailyStats.guessDistribution || {})
+            }
         };
-        saveToLocal(STORAGE_KEYS.DAILY_STATS, dailyStats);
     }
 
     // Daily History
     if (cloud.dailyHistory) {
-        dailyHistory = { ...dailyHistory, ...cloud.dailyHistory };
-        saveToLocal(STORAGE_KEYS.DAILY_HISTORY, dailyHistory);
+        dailyHistory = { ...cloud.dailyHistory };
     }
 
+    // In Progress
+    if (cloud.dailyInProgress) {
+        dailyInProgress = { ...cloud.dailyInProgress };
+    }
+
+    saveUserLocalState(uid);
     notifyListeners();
 }
 
@@ -175,10 +203,10 @@ async function syncAllToFirestore() {
 
     const userRef = doc(db, 'users', user.uid);
     try {
-        await setDoc(userRef, {
+        const payload = {
             displayName: user.displayName || '',
             email: user.email || '',
-            // Legacy classic stats keys for backward compatibility
+            // Legacy classic stats keys
             wins: classicStats.wins,
             total: classicStats.total,
             currentStreak: classicStats.currentStreak,
@@ -187,10 +215,13 @@ async function syncAllToFirestore() {
             classicStats,
             dailyStats,
             dailyHistory,
+            dailyInProgress,
             lastSyncedAt: Date.now()
-        }, { merge: true });
+        };
+        await setDoc(userRef, payload, { merge: true });
+        console.log(`[Firestore] Successfully saved cloud state for user ${user.uid}`);
     } catch (e) {
-        console.warn("Error syncing stats to Firestore:", e.message);
+        console.error("[Firestore] Error syncing stats to Firestore:", e);
     }
 }
 
@@ -209,7 +240,7 @@ export async function saveClassicGameResult(isWin) {
     } else {
         classicStats.currentStreak = 0;
     }
-    saveToLocal(STORAGE_KEYS.CLASSIC_STATS, classicStats);
+    saveUserLocalState();
     notifyListeners();
     await syncAllToFirestore();
 }
@@ -229,7 +260,6 @@ export function getDailyPuzzleResult(dateStr) {
 }
 
 export async function saveDailyGameResult({ dateStr, puzzleNumber, won, attempts, guesses, feedbackHistory }) {
-    // Record history entry
     dailyHistory[dateStr] = {
         date: dateStr,
         puzzleNumber,
@@ -239,13 +269,9 @@ export async function saveDailyGameResult({ dateStr, puzzleNumber, won, attempts
         feedbackHistory,
         completedAt: Date.now()
     };
-    saveToLocal(STORAGE_KEYS.DAILY_HISTORY, dailyHistory);
 
-    // Clear any in-progress state for this date
     delete dailyInProgress[dateStr];
-    saveToLocal(STORAGE_KEYS.DAILY_IN_PROGRESS, dailyInProgress);
 
-    // Update Daily Stats
     dailyStats.played++;
     if (won) {
         dailyStats.won++;
@@ -257,8 +283,8 @@ export async function saveDailyGameResult({ dateStr, puzzleNumber, won, attempts
     } else {
         dailyStats.currentStreak = 0;
     }
-    saveToLocal(STORAGE_KEYS.DAILY_STATS, dailyStats);
 
+    saveUserLocalState();
     notifyListeners();
     await syncAllToFirestore();
 }
@@ -266,7 +292,6 @@ export async function saveDailyGameResult({ dateStr, puzzleNumber, won, attempts
 export async function resetDailyGameResult(dateStr) {
     const prevResult = dailyHistory[dateStr];
     if (prevResult) {
-        // Rollback stats from the previous attempt
         dailyStats.played = Math.max(0, (dailyStats.played || 1) - 1);
         if (prevResult.won) {
             dailyStats.won = Math.max(0, (dailyStats.won || 1) - 1);
@@ -275,14 +300,11 @@ export async function resetDailyGameResult(dateStr) {
             }
         }
         delete dailyHistory[dateStr];
-        saveToLocal(STORAGE_KEYS.DAILY_HISTORY, dailyHistory);
-        saveToLocal(STORAGE_KEYS.DAILY_STATS, dailyStats);
     }
 
-    // Clear any in-progress state
     delete dailyInProgress[dateStr];
-    saveToLocal(STORAGE_KEYS.DAILY_IN_PROGRESS, dailyInProgress);
 
+    saveUserLocalState();
     notifyListeners();
     await syncAllToFirestore();
 }
@@ -297,7 +319,7 @@ export function saveDailyInProgress(dateStr, state) {
     } else {
         dailyInProgress[dateStr] = state;
     }
-    saveToLocal(STORAGE_KEYS.DAILY_IN_PROGRESS, dailyInProgress);
+    saveUserLocalState();
 }
 
 // --- Settings API ---
@@ -308,6 +330,6 @@ export function getSettings() {
 
 export function saveSettings(newSettings) {
     settings = { ...settings, ...newSettings };
-    saveToLocal(STORAGE_KEYS.SETTINGS, settings);
+    saveToLocal('mastermind_settings', settings);
     notifyListeners();
 }
