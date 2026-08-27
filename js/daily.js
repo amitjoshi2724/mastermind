@@ -197,7 +197,7 @@ export function loadDailyPuzzle(dateStr) {
             h.textContent = "";
         });
         const seqLabel = answerRow.querySelector('.sequence-label');
-        if (seqLabel) seqLabel.textContent = 'Correct Sequence';
+        if (seqLabel) seqLabel.textContent = '🧠 Correct Sequence';
     }
 
     // Rebuild 10 game rows

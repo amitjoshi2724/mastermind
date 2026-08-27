@@ -1,7 +1,11 @@
 /**
  * Storage Layer: LocalStorage + Firebase Firestore Dual Sync
  * Ensures offline play for guests and real-time cloud synchronization for authenticated users.
- * Supports multi-account switching with clean user isolation.
+ * Features:
+ * - Intelligent Guest-to-User progress migration on sign-in
+ * - Bidirectional union merge between local cache and Firestore cloud documents
+ * - Strict multi-account isolation on sign-out and account switching
+ * - Clear diagnostics for Firestore setup issues (rules / database creation)
  */
 import { db } from './firebase-config.js';
 import { onAuthChange, getCurrentUser } from './auth.js';
@@ -59,6 +63,14 @@ function saveToLocal(key, val) {
     }
 }
 
+function removeFromLocal(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (e) {
+        console.warn(`Error removing localStorage for ${key}:`, e);
+    }
+}
+
 function notifyListeners() {
     listeners.forEach(fn => {
         try {
@@ -103,7 +115,7 @@ export function onStorageChange(callback) {
     return () => listeners.delete(callback);
 }
 
-// Set up Firebase Auth sync listener with clean account switching
+// Set up Firebase Auth sync listener with clean account switching & guest migration
 onAuthChange(async (user) => {
     if (unsubscribeFirestore) {
         unsubscribeFirestore();
@@ -114,39 +126,77 @@ onAuthChange(async (user) => {
         currentSyncedUid = user.uid;
         console.log(`[Auth/Storage] Switched to user: ${user.displayName || user.email} (${user.uid})`);
 
-        // Load this user's local cache first
+        // Check if there is guest progress waiting to be migrated
+        const guestHistory = loadFromLocal('mastermind_guest_daily_history', {});
+        const guestClassic = loadFromLocal('mastermind_guest_classic_stats', null);
+        const guestDaily = loadFromLocal('mastermind_guest_daily_stats', null);
+
+        // Load this user's existing local cache
         loadUserLocalState(user.uid);
+
+        // Migrate guest games into user's account if guest had played
+        if (Object.keys(guestHistory).length > 0) {
+            console.log("[Auth/Storage] Migrating guest progress to user account:", Object.keys(guestHistory));
+            dailyHistory = { ...guestHistory, ...dailyHistory };
+            if (guestDaily) {
+                dailyStats.played = Math.max(dailyStats.played, guestDaily.played || 0);
+                dailyStats.won = Math.max(dailyStats.won, guestDaily.won || 0);
+                dailyStats.currentStreak = Math.max(dailyStats.currentStreak, guestDaily.currentStreak || 0);
+                dailyStats.maxStreak = Math.max(dailyStats.maxStreak, guestDaily.maxStreak || 0);
+                if (guestDaily.guessDistribution) {
+                    for (let i = 1; i <= 10; i++) {
+                        dailyStats.guessDistribution[i] = (dailyStats.guessDistribution[i] || 0) + (guestDaily.guessDistribution[i] || 0);
+                    }
+                }
+            }
+            if (guestClassic) {
+                classicStats.wins = Math.max(classicStats.wins, guestClassic.wins || 0);
+                classicStats.total = Math.max(classicStats.total, guestClassic.total || 0);
+                classicStats.currentStreak = Math.max(classicStats.currentStreak, guestClassic.currentStreak || 0);
+                classicStats.longestStreak = Math.max(classicStats.longestStreak, guestClassic.longestStreak || 0);
+            }
+            // Clear guest keys after migration
+            removeFromLocal('mastermind_guest_daily_history');
+            removeFromLocal('mastermind_guest_daily_stats');
+            removeFromLocal('mastermind_guest_classic_stats');
+            removeFromLocal('mastermind_guest_daily_in_progress');
+            saveUserLocalState(user.uid);
+        }
+
         notifyListeners();
 
         const userRef = doc(db, 'users', user.uid);
 
-        // Fetch from Firestore
+        // Fetch from Firestore and perform bidirectional union merge
         try {
             const snap = await getDoc(userRef);
             if (snap.exists()) {
                 const cloudData = snap.data();
                 console.log(`[Firestore] Loaded cloud profile for ${user.uid}:`, cloudData);
-                applyCloudData(cloudData, user.uid);
+                mergeCloudData(cloudData, user.uid);
+                // Write back unified union to cloud
+                await syncAllToFirestore();
             } else {
-                console.log(`[Firestore] New user document created for ${user.uid}`);
+                console.log(`[Firestore] Creating new cloud profile for ${user.uid}`);
                 await syncAllToFirestore();
             }
         } catch (error) {
-            console.error("[Firestore] Error fetching user data:", error);
-            if (error.code === 'permission-denied') {
-                console.warn("Firestore permission denied. Check that Firestore Security Rules allow read/write for request.auth.uid == userId.");
-            }
+            handleFirestoreError(error, "Fetching user profile");
         }
 
         // Attach real-time snapshot listener
-        unsubscribeFirestore = onSnapshot(userRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                applyCloudData(data, user.uid);
-            }
-        }, (error) => {
-            console.warn("[Firestore] Snapshot listener notice:", error.message);
-        });
+        try {
+            unsubscribeFirestore = onSnapshot(userRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    mergeCloudData(data, user.uid);
+                }
+            }, (error) => {
+                handleFirestoreError(error, "Real-time snapshot listener");
+            });
+        } catch (err) {
+            handleFirestoreError(err, "Attaching snapshot listener");
+        }
 
     } else {
         console.log("[Auth/Storage] Signed out — switched back to guest context.");
@@ -156,41 +206,63 @@ onAuthChange(async (user) => {
     }
 });
 
-function applyCloudData(cloud, uid = currentSyncedUid) {
+/**
+ * Bidirectional Union Merge: Combines cloud data with local data without losing any played games
+ */
+function mergeCloudData(cloud, uid = currentSyncedUid) {
     if (!cloud) return;
 
-    // Classic Stats
+    // 1. Merge Classic Stats (take max / best)
     if (cloud.classicStats) {
-        classicStats = { ...getDefaultClassicStats(), ...cloud.classicStats };
+        classicStats = {
+            wins: Math.max(classicStats.wins || 0, cloud.classicStats.wins || 0),
+            total: Math.max(classicStats.total || 0, cloud.classicStats.total || 0),
+            currentStreak: Math.max(classicStats.currentStreak || 0, cloud.classicStats.currentStreak || 0),
+            longestStreak: Math.max(classicStats.longestStreak || 0, cloud.classicStats.longestStreak || 0)
+        };
     } else if (cloud.total !== undefined) {
         classicStats = {
-            wins: cloud.wins || 0,
-            total: cloud.total || 0,
-            currentStreak: cloud.currentStreak || 0,
-            longestStreak: cloud.longestStreak || 0
+            wins: Math.max(classicStats.wins || 0, cloud.wins || 0),
+            total: Math.max(classicStats.total || 0, cloud.total || 0),
+            currentStreak: Math.max(classicStats.currentStreak || 0, cloud.currentStreak || 0),
+            longestStreak: Math.max(classicStats.longestStreak || 0, cloud.longestStreak || 0)
         };
     }
 
-    // Daily Stats
-    if (cloud.dailyStats) {
-        dailyStats = {
-            ...getDefaultDailyStats(),
-            ...cloud.dailyStats,
-            guessDistribution: {
-                ...getDefaultDailyStats().guessDistribution,
-                ...(cloud.dailyStats.guessDistribution || {})
+    // 2. Merge Daily History (Union of all dates from cloud + local)
+    const mergedHistory = { ...(cloud.dailyHistory || {}), ...dailyHistory };
+    dailyHistory = mergedHistory;
+
+    // 3. Recalculate or merge Daily Stats
+    const playedPuzzles = Object.values(dailyHistory);
+    let wonCount = 0;
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 };
+
+    playedPuzzles.forEach(p => {
+        if (p.won) {
+            wonCount++;
+            if (p.attempts >= 1 && p.attempts <= 10) {
+                distribution[p.attempts] = (distribution[p.attempts] || 0) + 1;
             }
-        };
-    }
+        }
+    });
 
-    // Daily History
-    if (cloud.dailyHistory) {
-        dailyHistory = { ...cloud.dailyHistory };
-    }
+    const cloudPlayed = cloud.dailyStats?.played || 0;
+    const cloudWon = cloud.dailyStats?.won || 0;
+    const cloudCurrentStreak = cloud.dailyStats?.currentStreak || 0;
+    const cloudMaxStreak = cloud.dailyStats?.maxStreak || 0;
 
-    // In Progress
-    if (cloud.dailyInProgress) {
-        dailyInProgress = { ...cloud.dailyInProgress };
+    dailyStats = {
+        played: Math.max(playedPuzzles.length, cloudPlayed, dailyStats.played || 0),
+        won: Math.max(wonCount, cloudWon, dailyStats.won || 0),
+        currentStreak: Math.max(cloudCurrentStreak, dailyStats.currentStreak || 0),
+        maxStreak: Math.max(cloudMaxStreak, dailyStats.maxStreak || 0),
+        guessDistribution: distribution
+    };
+
+    // 4. In-progress state
+    if (cloud.dailyInProgress && Object.keys(cloud.dailyInProgress).length > 0) {
+        dailyInProgress = { ...cloud.dailyInProgress, ...dailyInProgress };
     }
 
     saveUserLocalState(uid);
@@ -206,12 +278,10 @@ async function syncAllToFirestore() {
         const payload = {
             displayName: user.displayName || '',
             email: user.email || '',
-            // Legacy classic stats keys
             wins: classicStats.wins,
             total: classicStats.total,
             currentStreak: classicStats.currentStreak,
             longestStreak: classicStats.longestStreak,
-            // Modular structured stats
             classicStats,
             dailyStats,
             dailyHistory,
@@ -219,9 +289,28 @@ async function syncAllToFirestore() {
             lastSyncedAt: Date.now()
         };
         await setDoc(userRef, payload, { merge: true });
-        console.log(`[Firestore] Successfully saved cloud state for user ${user.uid}`);
+        console.log(`[Firestore] Successfully saved cloud state for user ${user.uid} (${Object.keys(dailyHistory).length} daily puzzles)`);
     } catch (e) {
-        console.error("[Firestore] Error syncing stats to Firestore:", e);
+        handleFirestoreError(e, "Saving state to Firestore");
+    }
+}
+
+function handleFirestoreError(error, actionContext = "Firestore operation") {
+    console.error(`[Firestore Error] during ${actionContext}:`, error);
+
+    if (error.code === 'permission-denied') {
+        const msg = `Firestore Security Rules Error: Permission denied.\n\n` +
+            `Make sure your Firestore Security Rules allow authenticated users to read & write their own document: users/{userId}.\n` +
+            `Check firestore.rules in your project or Firebase Console.`;
+        console.warn(msg);
+    } else if (error.code === 'not-found' || error.message?.includes('database') || error.message?.includes('does not exist')) {
+        const msg = `Firestore Database Notice:\n\n` +
+            `Cloud Firestore has not been created yet for Firebase project 'mastermind-amitjoshi2724'.\n\n` +
+            `To enable cloud sync:\n` +
+            `1. Open Firebase Console (https://console.firebase.google.com/project/mastermind-amitjoshi2724/firestore)\n` +
+            `2. Click "Create database"\n` +
+            `3. Choose a location and start in Test or Production mode.`;
+        console.warn(msg);
     }
 }
 
