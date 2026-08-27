@@ -2,8 +2,9 @@
  * Storage Layer: LocalStorage + Firebase Firestore Dual Sync
  * Ensures offline play for guests and real-time cloud synchronization for authenticated users.
  * Features:
- * - Intelligent Guest-to-User progress migration on sign-in
+ * - Intelligent Legacy & Guest-to-User progress migration on sign-in
  * - Bidirectional union merge between local cache and Firestore cloud documents
+ * - Automatic recalculation of guess distribution and streaks from history
  * - Strict multi-account isolation on sign-out and account switching
  * - Clear diagnostics for Firestore setup issues (rules / database creation)
  */
@@ -82,6 +83,37 @@ function notifyListeners() {
 }
 
 /**
+ * Recomputes guess distribution and basic stats from dailyHistory dictionary
+ */
+function recalculateDailyStatsFromHistory(history, currentStats = {}) {
+    const playedPuzzles = Object.values(history || {});
+    let wonCount = 0;
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 };
+
+    playedPuzzles.forEach(p => {
+        if (p && p.won) {
+            wonCount++;
+            if (p.attempts >= 1 && p.attempts <= 10) {
+                distribution[p.attempts] = (distribution[p.attempts] || 0) + 1;
+            }
+        }
+    });
+
+    const played = Math.max(playedPuzzles.length, currentStats.played || 0);
+    const won = Math.max(wonCount, currentStats.won || 0);
+    const currentStreak = currentStats.currentStreak || (wonCount > 0 ? 1 : 0);
+    const maxStreak = Math.max(currentStats.maxStreak || 0, currentStreak, wonCount > 0 ? 1 : 0);
+
+    return {
+        played,
+        won,
+        currentStreak,
+        maxStreak,
+        guessDistribution: distribution
+    };
+}
+
+/**
  * Load local storage data for a specific user ID (or guest if null)
  */
 function loadUserLocalState(uid) {
@@ -90,6 +122,11 @@ function loadUserLocalState(uid) {
     dailyHistory = loadFromLocal(getScopedKey('daily_history', uid), {});
     dailyInProgress = loadFromLocal(getScopedKey('daily_in_progress', uid), {});
     settings = loadFromLocal('mastermind_settings', { showNumbers: true });
+
+    // Always ensure guess distribution matches history
+    if (Object.keys(dailyHistory).length > 0) {
+        dailyStats = recalculateDailyStatsFromHistory(dailyHistory, dailyStats);
+    }
 }
 
 /**
@@ -103,8 +140,14 @@ function saveUserLocalState(uid = currentSyncedUid) {
     saveToLocal('mastermind_settings', settings);
 }
 
-// Initialize guest state on startup
+// Initial bootstrap from local storage (including check for legacy keys)
 loadUserLocalState(null);
+const bootLegacyHistory = loadFromLocal('mastermind_daily_history', {});
+if (Object.keys(bootLegacyHistory).length > 0) {
+    dailyHistory = { ...bootLegacyHistory, ...dailyHistory };
+    dailyStats = recalculateDailyStatsFromHistory(dailyHistory, dailyStats);
+    saveUserLocalState(null);
+}
 
 /**
  * Subscribe to storage updates (local or cloud)
@@ -126,43 +169,27 @@ onAuthChange(async (user) => {
         currentSyncedUid = user.uid;
         console.log(`[Auth/Storage] Switched to user: ${user.displayName || user.email} (${user.uid})`);
 
-        // Check if there is guest progress waiting to be migrated
+        // Check for any legacy un-scoped or guest progress to migrate into user account
+        const legacyHistory = loadFromLocal('mastermind_daily_history', {});
+        const legacyClassic = loadFromLocal('mastermind_classic_stats', null);
         const guestHistory = loadFromLocal('mastermind_guest_daily_history', {});
         const guestClassic = loadFromLocal('mastermind_guest_classic_stats', null);
-        const guestDaily = loadFromLocal('mastermind_guest_daily_stats', null);
 
         // Load this user's existing local cache
         loadUserLocalState(user.uid);
 
-        // Migrate guest games into user's account if guest had played
-        if (Object.keys(guestHistory).length > 0) {
-            console.log("[Auth/Storage] Migrating guest progress to user account:", Object.keys(guestHistory));
-            dailyHistory = { ...guestHistory, ...dailyHistory };
-            if (guestDaily) {
-                dailyStats.played = Math.max(dailyStats.played, guestDaily.played || 0);
-                dailyStats.won = Math.max(dailyStats.won, guestDaily.won || 0);
-                dailyStats.currentStreak = Math.max(dailyStats.currentStreak, guestDaily.currentStreak || 0);
-                dailyStats.maxStreak = Math.max(dailyStats.maxStreak, guestDaily.maxStreak || 0);
-                if (guestDaily.guessDistribution) {
-                    for (let i = 1; i <= 10; i++) {
-                        dailyStats.guessDistribution[i] = (dailyStats.guessDistribution[i] || 0) + (guestDaily.guessDistribution[i] || 0);
-                    }
-                }
-            }
-            if (guestClassic) {
-                classicStats.wins = Math.max(classicStats.wins, guestClassic.wins || 0);
-                classicStats.total = Math.max(classicStats.total, guestClassic.total || 0);
-                classicStats.currentStreak = Math.max(classicStats.currentStreak, guestClassic.currentStreak || 0);
-                classicStats.longestStreak = Math.max(classicStats.longestStreak, guestClassic.longestStreak || 0);
-            }
-            // Clear guest keys after migration
-            removeFromLocal('mastermind_guest_daily_history');
-            removeFromLocal('mastermind_guest_daily_stats');
-            removeFromLocal('mastermind_guest_classic_stats');
-            removeFromLocal('mastermind_guest_daily_in_progress');
-            saveUserLocalState(user.uid);
+        // Merge legacy and guest games into this account so nothing is lost
+        dailyHistory = { ...legacyHistory, ...guestHistory, ...dailyHistory };
+
+        if (legacyClassic || guestClassic) {
+            classicStats.wins = Math.max(classicStats.wins, legacyClassic?.wins || 0, guestClassic?.wins || 0);
+            classicStats.total = Math.max(classicStats.total, legacyClassic?.total || 0, guestClassic?.total || 0);
+            classicStats.currentStreak = Math.max(classicStats.currentStreak, legacyClassic?.currentStreak || 0, guestClassic?.currentStreak || 0);
+            classicStats.longestStreak = Math.max(classicStats.longestStreak, legacyClassic?.longestStreak || 0, guestClassic?.longestStreak || 0);
         }
 
+        dailyStats = recalculateDailyStatsFromHistory(dailyHistory, dailyStats);
+        saveUserLocalState(user.uid);
         notifyListeners();
 
         const userRef = doc(db, 'users', user.uid);
@@ -174,12 +201,9 @@ onAuthChange(async (user) => {
                 const cloudData = snap.data();
                 console.log(`[Firestore] Loaded cloud profile for ${user.uid}:`, cloudData);
                 mergeCloudData(cloudData, user.uid);
-                // Write back unified union to cloud
-                await syncAllToFirestore();
-            } else {
-                console.log(`[Firestore] Creating new cloud profile for ${user.uid}`);
-                await syncAllToFirestore();
             }
+            // Always push the complete unified state to Firestore
+            await syncAllToFirestore();
         } catch (error) {
             handleFirestoreError(error, "Fetching user profile");
         }
@@ -230,35 +254,15 @@ function mergeCloudData(cloud, uid = currentSyncedUid) {
     }
 
     // 2. Merge Daily History (Union of all dates from cloud + local)
-    const mergedHistory = { ...(cloud.dailyHistory || {}), ...dailyHistory };
-    dailyHistory = mergedHistory;
+    dailyHistory = { ...(cloud.dailyHistory || {}), ...dailyHistory };
 
-    // 3. Recalculate or merge Daily Stats
-    const playedPuzzles = Object.values(dailyHistory);
-    let wonCount = 0;
-    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 };
-
-    playedPuzzles.forEach(p => {
-        if (p.won) {
-            wonCount++;
-            if (p.attempts >= 1 && p.attempts <= 10) {
-                distribution[p.attempts] = (distribution[p.attempts] || 0) + 1;
-            }
-        }
+    // 3. Recalculate Daily Stats and Guess Distribution from complete history
+    dailyStats = recalculateDailyStatsFromHistory(dailyHistory, {
+        played: cloud.dailyStats?.played || dailyStats.played,
+        won: cloud.dailyStats?.won || dailyStats.won,
+        currentStreak: cloud.dailyStats?.currentStreak || dailyStats.currentStreak,
+        maxStreak: cloud.dailyStats?.maxStreak || dailyStats.maxStreak
     });
-
-    const cloudPlayed = cloud.dailyStats?.played || 0;
-    const cloudWon = cloud.dailyStats?.won || 0;
-    const cloudCurrentStreak = cloud.dailyStats?.currentStreak || 0;
-    const cloudMaxStreak = cloud.dailyStats?.maxStreak || 0;
-
-    dailyStats = {
-        played: Math.max(playedPuzzles.length, cloudPlayed, dailyStats.played || 0),
-        won: Math.max(wonCount, cloudWon, dailyStats.won || 0),
-        currentStreak: Math.max(cloudCurrentStreak, dailyStats.currentStreak || 0),
-        maxStreak: Math.max(cloudMaxStreak, dailyStats.maxStreak || 0),
-        guessDistribution: distribution
-    };
 
     // 4. In-progress state
     if (cloud.dailyInProgress && Object.keys(cloud.dailyInProgress).length > 0) {
@@ -289,7 +293,7 @@ async function syncAllToFirestore() {
             lastSyncedAt: Date.now()
         };
         await setDoc(userRef, payload, { merge: true });
-        console.log(`[Firestore] Successfully saved cloud state for user ${user.uid} (${Object.keys(dailyHistory).length} daily puzzles)`);
+        console.log(`[Firestore] ✅ Saved ${Object.keys(dailyHistory).length} daily puzzles & stats for ${user.email} (${user.uid})`);
     } catch (e) {
         handleFirestoreError(e, "Saving state to Firestore");
     }
@@ -361,17 +365,13 @@ export async function saveDailyGameResult({ dateStr, puzzleNumber, won, attempts
 
     delete dailyInProgress[dateStr];
 
-    dailyStats.played++;
-    if (won) {
-        dailyStats.won++;
-        dailyStats.currentStreak++;
-        dailyStats.maxStreak = Math.max(dailyStats.maxStreak, dailyStats.currentStreak);
-        if (attempts >= 1 && attempts <= 10) {
-            dailyStats.guessDistribution[attempts] = (dailyStats.guessDistribution[attempts] || 0) + 1;
-        }
-    } else {
-        dailyStats.currentStreak = 0;
-    }
+    // Recalculate stats and guess distribution directly from updated history
+    dailyStats = recalculateDailyStatsFromHistory(dailyHistory, {
+        played: dailyStats.played + 1,
+        won: won ? dailyStats.won + 1 : dailyStats.won,
+        currentStreak: won ? dailyStats.currentStreak + 1 : 0,
+        maxStreak: won ? Math.max(dailyStats.maxStreak, dailyStats.currentStreak + 1) : dailyStats.maxStreak
+    });
 
     saveUserLocalState();
     notifyListeners();
@@ -379,19 +379,16 @@ export async function saveDailyGameResult({ dateStr, puzzleNumber, won, attempts
 }
 
 export async function resetDailyGameResult(dateStr) {
-    const prevResult = dailyHistory[dateStr];
-    if (prevResult) {
-        dailyStats.played = Math.max(0, (dailyStats.played || 1) - 1);
-        if (prevResult.won) {
-            dailyStats.won = Math.max(0, (dailyStats.won || 1) - 1);
-            if (prevResult.attempts && dailyStats.guessDistribution && dailyStats.guessDistribution[prevResult.attempts]) {
-                dailyStats.guessDistribution[prevResult.attempts] = Math.max(0, dailyStats.guessDistribution[prevResult.attempts] - 1);
-            }
-        }
-        delete dailyHistory[dateStr];
-    }
-
+    delete dailyHistory[dateStr];
     delete dailyInProgress[dateStr];
+
+    // Recompute stats from remaining history
+    dailyStats = recalculateDailyStatsFromHistory(dailyHistory, {
+        played: Math.max(0, (dailyStats.played || 1) - 1),
+        won: Math.max(0, (dailyStats.won || 1) - 1),
+        currentStreak: dailyStats.currentStreak,
+        maxStreak: dailyStats.maxStreak
+    });
 
     saveUserLocalState();
     notifyListeners();
