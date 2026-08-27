@@ -127,11 +127,20 @@ export function initDailyMode() {
     startCountdownTimer();
 
     // Storage & Auth change listener
-    onStorageChange(() => {
+    let lastKnownResultKey = null;
+    onStorageChange(({ dailyHistory }) => {
         updateStatsModalContent();
         renderArchiveList();
         renderCalendarView();
-        loadDailyPuzzle(activeDateStr);
+
+        // Only reload the board if the completion status of the active date changed
+        // (e.g. Firestore just delivered a solved result we didn't have locally)
+        const result = dailyHistory && dailyHistory[activeDateStr];
+        const resultKey = result ? (result.completedAt + '_' + result.attempts) : 'none';
+        if (resultKey !== lastKnownResultKey) {
+            lastKnownResultKey = resultKey;
+            loadDailyPuzzle(activeDateStr);
+        }
     });
 
     // Initial load active puzzle
