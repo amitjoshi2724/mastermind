@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mastermind Game</title>
-    <link rel="icon" type="image/x-icon" href="favicon.ico?v=2">
-    <link rel="stylesheet" href="./css/modals.css">
+    <title>Mastermindle — Daily Puzzle Challenge</title>
+    <link rel="icon" type="image/x-icon" href="../favicon.ico?v=2">
+    <link rel="stylesheet" href="../css/modals.css">
     <style>
         /* Global box-sizing so that padding and border are included in width/height */
         * {
@@ -211,7 +211,7 @@
             background-color: #d2d2dc;
         }
 
-        /* Right Panel – Instructions and Scoreboard (30%) */
+        /* Right Panel – Instructions and Daily Controls (30%) */
         #instruction-panel {
             background-color: #d2d2dc;
             padding: 2%;
@@ -220,21 +220,35 @@
             font-size: clamp(0.8rem, 1.2vw, 1.2rem);
         }
 
-        #scoreboard {
-            margin-top: 2vh;
-            padding: 1%;
-            border: 0.1rem solid black;
-            background-color: rgb(210, 210, 220);
-            text-align: center;
+        #daily-quick-actions {
+            margin-top: 1.5vh;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
-        #scoreboard div {
-            margin: 0.5vh 0;
+        .daily-action-big-btn {
+            padding: 10px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            border: 0.1rem solid black;
+            background-color: #ffffff;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background-color 0.15s;
+        }
+
+        .daily-action-big-btn:hover {
+            background-color: #e3f2fd;
         }
 
         /* Toggle Container for Number Visibility */
         #toggle-container {
-            margin-top: 1vh;
+            margin-top: 2vh;
             text-align: center;
             font-size: clamp(0.8rem, 1.2vw, 1.2rem);
         }
@@ -285,23 +299,6 @@
 
         input:checked+.slider:before {
             transform: translateX(26px);
-        }
-
-        /* Reset Button in the left panel */
-        .reset-button {
-            font-size: clamp(1.5rem, 2vw, 2.5rem);
-            padding: 1vh 2vw;
-            margin-top: 2vh;
-            width: 100%;
-            align-self: center;
-            background-color: rgb(210, 210, 220);
-            border: 0.1rem solid black;
-            color: #000000;
-            cursor: pointer;
-        }
-
-        .reset-button:hover {
-            background-color: #ffffff;
         }
 
         /* Media queries – stack panels vertically on smaller screens */
@@ -413,15 +410,24 @@
 </head>
 
 <body>
-    <!-- Top Navigation Bar for Cross-Mode Navigation -->
+    <!-- Top Navigation Bar for Cross-Mode Navigation & Daily Modals -->
     <div class="mode-nav-bar">
         <div class="mode-title">
-            <span>♾️ Classic Mastermind (Unlimited)</span>
+            <span id="daily-puzzle-title">📅 Mastermindle</span>
         </div>
         <div class="nav-links-group">
-            <a href="./mastermindle/" class="nav-action-btn" style="background-color: #e8f5e9; color: #1b5e20; border-color: #2e7d32;">
-                <span>📅 Play Daily Mastermindle</span>
+            <a href="../index.html" class="nav-action-btn" style="background-color: #e3f2fd; color: #0d47a1; border-color: #1976d2;">
+                <span>♾️ Play Unlimited Mode</span>
             </a>
+            <button id="open-archive-btn" class="nav-action-btn">
+                <span>📅 Archive</span>
+            </button>
+            <button id="open-stats-btn" class="nav-action-btn">
+                <span>📊 Stats</span>
+            </button>
+            <button id="open-help-btn" class="nav-action-btn">
+                <span>❓ Help</span>
+            </button>
         </div>
     </div>
 
@@ -449,7 +455,8 @@
                     <button class="color-btn" style="background-color: #8e24aa">6</button>
                 </div>
             </div>
-            <button class="reset-button">Reset Game</button>
+            <button id="daily-retry-btn" class="daily-action-big-btn" style="background-color: #fff3e0; color: #e65100; border-color: #f57c00; margin-bottom: 6px;">🔄 Retry / Reset Puzzle</button>
+            <button class="daily-action-big-btn" onclick="document.getElementById('open-archive-btn').click()">📅 Browse Past Puzzles</button>
         </div>
 
         <!-- Game Board -->
@@ -461,11 +468,11 @@
                 <div class="hole"></div>
                 <div class="hole"></div>
                 <div class="sequence-label">🧠 Correct Sequence</div>
-                <div class="mastermind-label">Mastermind</div>
+                <div class="mastermind-label">Mastermindle</div>
             </div>
         </div>
 
-        <!-- Instructions Panel -->
+        <!-- Right Panel – Instructions, Daily Actions & Auth -->
         <div id="instruction-panel" style="position: relative;">
             <div id="auth-container"
                 style="margin-bottom: 2vh; display: flex; justify-content: flex-end; align-items: center; gap: 10px; max-width: 100%;">
@@ -516,42 +523,36 @@
                     style="padding: 6px 12px; cursor: pointer; font-size: 0.9rem; background-color: #db4437; color: white; border: 0.1rem solid black; border-radius: 4px; display: none;">Sign
                     Out</button>
             </div>
+
+            <!-- Daily Mode Summary & Rules Section -->
             <section
                 style="font-family: sans-serif; line-height: 1.3; font-size: 0.85rem; color: #333; max-width: 600px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
-                <h2 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 1.2rem;">Welcome to Mastermind!</h2>
-                <p style="margin: 0 0 10px 0;">Crack the secret code in ten attempts or less.</p>
+                <h2 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 1.2rem;">Welcome to Mastermindle!</h2>
+                <p style="margin: 0 0 10px 0;">Crack the daily secret code in ten attempts or less. Everyone gets the exact same code worldwide!</p>
+                
+                <div style="background: rgb(210, 210, 220); border: 0.1rem solid black; padding: 8px; border-radius: 4px; margin-bottom: 10px; text-align: center;">
+                    <div style="font-weight: bold; font-size: 0.8rem; color: #111; text-transform: uppercase;">Next Daily Puzzle In:</div>
+                    <div id="daily-countdown-timer" style="font-size: 1.3rem; font-family: monospace; font-weight: bold; color: #000;">00:00:00</div>
+                </div>
+
                 <ul style="padding-left: 20px; margin: 0 0 10px 0;">
-                    <li style="margin-bottom: 3px;"><strong>The Secret Code:</strong> A hidden sequence of 4 colors is
-                        generated at the
-                        start. Colors
-                        <strong>can</strong> be repeated within the code, with 6 colors to choose from.
-                    </li>
-                    <li style="margin-bottom: 3px;"><strong>Feedback System:</strong> After each guess, you will receive
-                        pegs to help you narrow
-                        down the sequence:
+                    <li style="margin-bottom: 3px;"><strong>The Secret Code:</strong> A hidden sequence of 4 colors is generated for today. Colors <strong>can</strong> be repeated, with 6 colors to choose from.</li>
+                    <li style="margin-bottom: 3px;"><strong>Feedback System:</strong> After each guess, you receive pegs:
                         <ul style="padding-left: 20px; margin-top: 2px;">
-                            <li><strong>White Peg:</strong> One of your colors is the <strong>correct color</strong> and
-                                in the <strong>correct position</strong>.</li>
-                            <li><strong>Black Peg:</strong> One of your colors is in the code, but in the <strong>wrong
-                                    position</strong>.</li>
+                            <li><strong>White Peg:</strong> One color is the <strong>correct color</strong> and in the <strong>correct position</strong>.</li>
+                            <li><strong>Black Peg:</strong> One color is in the code, but in the <strong>wrong position</strong>.</li>
                         </ul>
                     </li>
-                    <li style="margin-bottom: 3px;"><strong>The Duplicate Rule:</strong> Feedback is a 1-to-1 match. You
-                        get awarded a peg each time a color in your guess appears in the secret code.</li>
+                    <li style="margin-bottom: 3px;"><strong>Archive:</strong> Missed a day? Click <strong>Archive</strong> in the top bar to play any past daily puzzle!</li>
                 </ul>
 
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
 
                 <h3 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 1rem;">How to Play</h3>
                 <ol style="padding-left: 20px; margin: 0;">
-                    <li style="margin-bottom: 4px;"><strong>Place Your Guess:</strong> Click the colored circle buttons
-                        to fill a row with your chosen sequence, and use the <strong>Undo</strong>
-                        button to edit the current row before submitting.</li>
-                    <li style="margin-bottom: 4px;"><strong>Submit:</strong> When satisfied with your guess,
-                        click <strong>Check</strong> to lock it in and get feedback.
-                    </li>
-                    <li style="margin-bottom: 4px;"><strong>Analyze &amp; Repeat:</strong> Use the feedback
-                        to narrow down the code. Guess the sequence within 10 tries to win!</li>
+                    <li style="margin-bottom: 4px;"><strong>Place Your Guess:</strong> Click the colored circle buttons to fill a row, and use <strong>Undo</strong> to edit.</li>
+                    <li style="margin-bottom: 4px;"><strong>Submit:</strong> Click <strong>Check</strong> to submit and get feedback.</li>
+                    <li style="margin-bottom: 4px;"><strong>Win &amp; Share:</strong> Crack the code in 10 tries, track your stats, and share your score!</li>
                 </ol>
             </section>
 
@@ -574,11 +575,6 @@
                 </div>
             </div>
 
-            <div id="scoreboard">
-                <div>Wins: 0/0 (0.00%)</div>
-                <div>Current Streak: 0</div>
-                <div>Longest Streak: 0</div>
-            </div>
             <!-- Toggle switch for showing/hiding numbers -->
             <div id="toggle-container">
                 <span>Show Numbers:</span>
@@ -591,8 +587,156 @@
         </div>
     </div>
 
+    <!-- MODAL 1: Archive Modal (Calendar Picker & List View) -->
+    <div id="archive-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">📅 Mastermindle Archive</h3>
+                <button class="modal-close-btn">&times;</button>
+            </div>
+
+            <!-- View Switcher Tabs -->
+            <div class="archive-view-tabs">
+                <button id="archive-tab-calendar" class="archive-tab-btn active">📅 Calendar View</button>
+                <button id="archive-tab-list" class="archive-tab-btn">📋 List View</button>
+            </div>
+
+            <!-- VIEW 1: Calendar View (Default) -->
+            <div id="archive-calendar-view">
+                <div class="calendar-nav-bar">
+                    <button id="cal-prev-month-btn" class="calendar-nav-btn" title="Previous Month">◀ Prev</button>
+                    <div class="calendar-selectors-group">
+                        <select id="cal-month-select" class="calendar-select" aria-label="Select Month">
+                            <option value="0">January</option>
+                            <option value="1">February</option>
+                            <option value="2">March</option>
+                            <option value="3">April</option>
+                            <option value="4">May</option>
+                            <option value="5">June</option>
+                            <option value="6">July</option>
+                            <option value="7">August</option>
+                            <option value="8">September</option>
+                            <option value="9">October</option>
+                            <option value="10">November</option>
+                            <option value="11">December</option>
+                        </select>
+                        <select id="cal-year-select" class="calendar-select" aria-label="Select Year">
+                            <!-- Populated in JS -->
+                        </select>
+                        <button id="cal-today-btn" class="calendar-nav-btn" style="font-size: 0.75rem; padding: 4px 8px;">Today</button>
+                    </div>
+                    <button id="cal-next-month-btn" class="calendar-nav-btn" title="Next Month">Next ▶</button>
+                </div>
+
+                <div class="calendar-weekdays-grid">
+                    <div>Sun</div>
+                    <div>Mon</div>
+                    <div>Tue</div>
+                    <div>Wed</div>
+                    <div>Thu</div>
+                    <div>Fri</div>
+                    <div>Sat</div>
+                </div>
+
+                <div id="calendar-days-container" class="calendar-days-grid">
+                    <!-- Dynamically generated day slots with Day # and Puzzle # -->
+                </div>
+            </div>
+
+            <!-- VIEW 2: List View -->
+            <div id="archive-list-view" style="display: none;">
+                <div class="archive-controls">
+                    <input type="text" id="archive-search" class="archive-search-input" placeholder="Search by date (YYYY-MM-DD) or #...">
+                    <button class="archive-filter-btn active" data-filter="all">All</button>
+                    <button class="archive-filter-btn" data-filter="solved">Solved</button>
+                    <button class="archive-filter-btn" data-filter="unplayed">Unplayed</button>
+                </div>
+                <div id="archive-list-container" class="archive-list">
+                    <!-- Dynamically populated list -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Wordle-Style Statistics Modal -->
+    <div id="stats-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">📊 Statistics</h3>
+                <button class="modal-close-btn">&times;</button>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div id="stat-played" class="stat-value">0</div>
+                    <div class="stat-label">Played</div>
+                </div>
+                <div class="stat-box">
+                    <div id="stat-win-pct" class="stat-value">0</div>
+                    <div class="stat-label">Win %</div>
+                </div>
+                <div class="stat-box">
+                    <div id="stat-streak" class="stat-value">0</div>
+                    <div class="stat-label">Current Streak</div>
+                </div>
+                <div class="stat-box">
+                    <div id="stat-max-streak" class="stat-value">0</div>
+                    <div class="stat-label">Max Streak</div>
+                </div>
+            </div>
+
+            <div class="distribution-section">
+                <div class="distribution-title">Your Guess Distribution (Tries to Win)</div>
+                <div id="guess-distribution-bars">
+                    <!-- Dynamically populated bars 1 to 10 -->
+                </div>
+            </div>
+
+            <!-- Share Preview Card (visible when current puzzle is completed) -->
+            <div id="share-preview-section" style="display: none; margin-top: 15px; border-top: 0.1rem solid black; padding-top: 12px;">
+                <div style="font-size: 0.85rem; font-weight: bold; color: #222; text-transform: uppercase; margin-bottom: 6px;">Share Preview:</div>
+                <pre id="share-preview-box" style="background: #ffffff; border: 0.1rem solid black; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 0.95rem; line-height: 1.35; white-space: pre-wrap; margin: 0 0 10px 0; text-align: center; color: #111; user-select: all; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);"></pre>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button id="share-score-btn" class="share-btn" style="flex: 1;">
+                        <span>📋 Copy Score</span>
+                    </button>
+                    <button id="stats-retry-btn" class="nav-action-btn" style="background-color: #fff3e0; color: #e65100; border: 0.1rem solid #e65100; font-weight: bold; padding: 10px 15px; font-size: 0.95rem; border-radius: 4px; cursor: pointer; flex: 1; justify-content: center;">
+                        <span>🔄 Retry / Reset</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: How to Play Modal -->
+    <div id="help-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">❓ How to Play Mastermindle</h3>
+                <button class="modal-close-btn">&times;</button>
+            </div>
+            <div style="font-size: 0.9rem; line-height: 1.4; color: #222;">
+                <p><strong>Goal:</strong> Crack the hidden 4-color code in 10 attempts or less.</p>
+                <ul style="padding-left: 20px; margin-bottom: 12px;">
+                    <li>Colors <strong>can be repeated</strong> in the code.</li>
+                    <li>There are 6 color choices (digits 1 to 6).</li>
+                    <li>Everyone in the world gets the exact same code on each date.</li>
+                </ul>
+
+                <h4 style="margin: 10px 0 5px 0;">Feedback Pegs:</h4>
+                <ul style="padding-left: 20px; margin-bottom: 12px;">
+                    <li><strong>⚪ White Peg:</strong> One of your colors is the <strong>correct color</strong> and in the <strong>correct spot</strong>.</li>
+                    <li><strong>⚫ Black Peg:</strong> One of your colors is in the code, but in the <strong>wrong spot</strong>.</li>
+                    <li>Feedback is a 1-to-1 match. Pegs are sorted whites first, then blacks.</li>
+                </ul>
+
+                <h4 style="margin: 10px 0 5px 0;">Archive &amp; Streaks:</h4>
+                <p style="margin: 0;">Play today's daily puzzle or visit the <strong>Archive</strong> to solve past daily puzzles at any time!</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Modular Script -->
-    <script type="module" src="./js/classic.js"></script>
+    <script type="module" src="../js/daily.js"></script>
 </body>
 
 </html>
