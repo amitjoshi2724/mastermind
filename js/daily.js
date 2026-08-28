@@ -280,6 +280,14 @@ function restoreCompletedGame(result) {
     feedbackHistory = result.feedbackHistory || [];
     currentRow = guessHistory.length;
 
+    console.log('[Restore] restoreCompletedGame called:', {
+        guessCount: guessHistory.length,
+        firstGuess: guessHistory[0],
+        firstGuessType: guessHistory[0] ? typeof guessHistory[0][0] : 'n/a',
+        won: result.won,
+        attempts: result.attempts
+    });
+
     enableColorButtons(false);
     const undoBtn = document.getElementById('undo-button');
     if (undoBtn) undoBtn.disabled = true;
@@ -316,11 +324,14 @@ function restoreInProgressGame(inProgress) {
 
 function renderRowGuess(rowIdx, guess) {
     const rowElements = document.getElementsByClassName('game-row');
-    const rowEl = rowElements[1 + (MAX_ROWS - 1 - rowIdx)];
+    const targetIndex = 1 + (MAX_ROWS - 1 - rowIdx);
+    const rowEl = rowElements[targetIndex];
+    console.log(`[Restore] renderRowGuess rowIdx=${rowIdx} targetIndex=${targetIndex} totalGameRows=${rowElements.length} rowEl=${rowEl ? 'found' : 'MISSING'} guess=`, guess);
     if (!rowEl) return;
 
     guess.forEach((colorId, colIdx) => {
         const colorObj = COLORS.find(c => c.id === colorId);
+        console.log(`  col=${colIdx} colorId=${colorId} type=${typeof colorId} colorObj=`, colorObj ? colorObj.name : 'NOT FOUND');
         if (colorObj) {
             rowEl.children[colIdx].style.backgroundColor = colorObj.hex;
             rowEl.children[colIdx].textContent = colorObj.label;
