@@ -7,10 +7,11 @@
 import { COLORS, MAX_ROWS, CODE_LENGTH, generateRandomCode, evaluateGuess } from './engine.js';
 import { setupAuthUI } from './auth.js';
 import { getClassicStats, saveClassicGameResult, onStorageChange } from './storage.js';
-import { initNumberToggle, showToast, setupModalListeners } from './ui.js';
+import { renderNumberToggle, renderDeveloperFooter, showToast, setupModalListeners } from './ui.js';
 import {
     resetBoard,
     resetAnswerRow,
+    renderColorButtons,
     renderRowFeedback,
     revealAnswer,
     enableColorButtons,
@@ -26,24 +27,10 @@ let gameActive = true;
 
 export function initClassicMode() {
     setupModalListeners();
-    initNumberToggle('numberToggle');
-
-    setupAuthUI({
-        loginBtn: document.getElementById('login-btn'),
-        loginDropdown: document.getElementById('login-dropdown'),
-        googleLoginBtn: document.getElementById('google-login-btn'),
-        logoutBtn: document.getElementById('logout-btn'),
-        userInfoBtn: document.getElementById('user-info'),
-        userDisplayNameEl: document.getElementById('user-display-name'),
-        userAvatarEl: document.getElementById('user-avatar'),
-        identityDropdown: document.getElementById('identity-dropdown'),
-        identityList: document.getElementById('identity-list')
-    });
-
-    // Colour button listeners
-    document.querySelectorAll('.button-cell').forEach((cell, index) => {
-        cell.onclick = () => selectColor(index);
-    });
+    renderNumberToggle('toggle-container');
+    renderDeveloperFooter('developer-footer');
+    setupAuthUI('auth-container');
+    renderColorButtons('color-buttons', selectColor);
 
     // Undo button
     const undoBtn = document.getElementById('undo-button');

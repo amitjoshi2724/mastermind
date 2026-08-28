@@ -259,3 +259,29 @@ export function clearLastColorFromRow(currentRow, guessLength) {
     const checkBtn = rowEl.querySelector('.check-button');
     if (checkBtn) checkBtn.disabled = true;
 }
+
+/**
+ * Render the 6 color selection buttons dynamically into a container.
+ * @param {string}   containerId   ID of the parent container element.
+ * @param {Function} onColorSelect Callback receiving the 0-based colorIndex.
+ */
+export function renderColorButtons(containerId = 'color-buttons', onColorSelect) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.innerHTML = '';
+    COLORS.forEach((color, index) => {
+        const cell = document.createElement('div');
+        cell.className = 'button-cell';
+        cell.onclick = () => onColorSelect(index);
+
+        const btn = document.createElement('button');
+        btn.className = 'color-btn';
+        btn.style.backgroundColor = color.hex;
+        btn.textContent = color.label;
+
+        cell.appendChild(btn);
+        container.appendChild(cell);
+    });
+}
+

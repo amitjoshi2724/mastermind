@@ -1,0 +1,510 @@
+/* ==========================================================================
+   Mastermind & Mastermindle — Shared Core Stylesheet
+   Centralizes all base layout, button-board, hole-board, pegs, rows, auth,
+   and responsive media queries across both game modes.
+   ========================================================================== */
+
+/* Global box-sizing */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f5;
+    margin: 0;
+    padding: 2vh;
+}
+
+/* Number Visibility Toggle State */
+body.hide-numbers .color-btn,
+body.hide-numbers .hole {
+    color: transparent !important;
+    -webkit-text-stroke: 0px !important;
+}
+
+/* Three-Panel Main Game Container */
+#game-container {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    min-height: calc(100vh - 4vh);
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+/* --------------------------------------------------------------------------
+   Left Panel: Color Selection Panel (30%)
+   -------------------------------------------------------------------------- */
+#button-board {
+    background-color: rgb(210, 210, 220);
+    padding: 2%;
+    border: 0.1rem solid black;
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    gap: 2vh;
+}
+
+/* Undo Button */
+#undo-button {
+    font-size: clamp(1.5rem, 3vw, 3rem);
+    padding: 2vh;
+    margin-bottom: 0;
+    background-color: rgb(210, 210, 220);
+    border: 0.1rem solid black;
+    color: rgb(128, 128, 128);
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+#undo-button:disabled {
+    background-color: #e0e0e0;
+    color: #a0a0a0;
+    cursor: not-allowed;
+    border: 0.1rem solid #a0a0a0;
+}
+
+#undo-button:not(:disabled) {
+    background-color: #ffffff;
+    color: #000000;
+}
+
+/* Color buttons grid (2 cols x 3 rows) */
+#color-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(3, 1fr);
+    gap: 0;
+    width: 100%;
+}
+
+.button-cell {
+    background-color: rgb(210, 210, 220);
+    border: 0.1rem solid black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: border 0.1s;
+    cursor: pointer;
+    aspect-ratio: 1;
+}
+
+.button-cell:hover {
+    border: 0.3rem solid rgb(51, 153, 255);
+}
+
+.color-btn {
+    width: 70%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 0.15rem solid black;
+    pointer-events: none;
+    color: black;
+    font-weight: bold;
+    -webkit-text-stroke: 1px white;
+    font-size: clamp(1rem, 2vw, 2.5rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Reset Button in Classic Mode */
+.reset-button {
+    font-size: clamp(1.5rem, 2vw, 2.5rem);
+    padding: 1vh 2vw;
+    margin-top: 2vh;
+    width: 100%;
+    align-self: center;
+    background-color: rgb(210, 210, 220);
+    border: 0.1rem solid black;
+    color: #000000;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.reset-button:hover {
+    background-color: #ffffff;
+}
+
+/* Big Action Buttons in Daily Mode */
+.daily-action-big-btn {
+    padding: 10px;
+    font-size: 0.95rem;
+    font-weight: bold;
+    border: 0.1rem solid black;
+    background-color: #ffffff;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 0.15s;
+}
+
+.daily-action-big-btn:hover {
+    background-color: #e3f2fd;
+}
+
+/* --------------------------------------------------------------------------
+   Center Panel: Hole Board (40%)
+   -------------------------------------------------------------------------- */
+#hole-board {
+    background-color: rgb(210, 210, 220);
+    padding: 2%;
+    border: 0.1rem solid black;
+    display: flex;
+    flex-direction: column;
+    width: 40%;
+    justify-content: flex-start;
+}
+
+.game-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+    margin-bottom: 0.5%;
+    padding-bottom: 1%;
+    border-bottom: 0.1rem solid rgba(0, 0, 0, 0.3);
+    width: 100%;
+}
+
+#answer-row {
+    border-bottom: 0.2rem solid black;
+    margin-bottom: 1%;
+    padding-bottom: 1%;
+}
+
+.hole {
+    width: 10%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 0.15rem solid black;
+    background-color: #d2d2dc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: black;
+    -webkit-text-stroke: 1px white;
+    font-size: clamp(1rem, 2vw, 2rem);
+}
+
+#answer-row .hole {
+    font-size: clamp(1.2rem, 2.5vw, 2.5rem);
+}
+
+.sequence-label,
+.mastermind-label {
+    width: 22%;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(0.6rem, 1.2vw, 1.2rem);
+    word-wrap: break-word;
+}
+
+.check-button {
+    width: 18%;
+    padding: 2% 1%;
+    cursor: pointer;
+    font-size: clamp(0.7rem, 1.5vw, 1.5rem);
+    border: 0.1rem solid black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background-color: #ffffff;
+}
+
+.check-button:disabled {
+    cursor: not-allowed;
+    background-color: #e0e0e0;
+}
+
+.feedback-column {
+    width: 15%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.feedback {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 6%;
+    width: 65%;
+    aspect-ratio: 1;
+    border: 0.1rem solid black;
+    padding: 3%;
+}
+
+.peg {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 0.1rem solid black;
+    background-color: #d2d2dc;
+}
+
+/* --------------------------------------------------------------------------
+   Right Panel: Instructions, Info & Controls (30%)
+   -------------------------------------------------------------------------- */
+#instruction-panel {
+    background-color: #d2d2dc;
+    padding: 2%;
+    border: 0.1rem solid black;
+    width: 30%;
+    font-size: clamp(0.8rem, 1.2vw, 1.2rem);
+    position: relative;
+}
+
+#scoreboard {
+    margin-top: 2vh;
+    padding: 1%;
+    border: 0.1rem solid black;
+    background-color: rgb(210, 210, 220);
+    text-align: center;
+}
+
+#scoreboard div {
+    margin: 0.5vh 0;
+}
+
+#daily-quick-actions {
+    margin-top: 1.5vh;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Number Visibility Toggle Switch */
+#toggle-container {
+    margin-top: 1.5vh;
+    text-align: center;
+    font-size: clamp(0.8rem, 1.2vw, 1.2rem);
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    vertical-align: middle;
+    margin-left: 8px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #2196F3;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+/* --------------------------------------------------------------------------
+   Authentication UI & Dropdowns
+   -------------------------------------------------------------------------- */
+#auth-container {
+    margin-bottom: 2vh;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    max-width: 100%;
+}
+
+#user-info {
+    display: none;
+    font-size: clamp(0.55rem, 1.8vw, 1rem);
+    color: #000;
+    align-items: center;
+    background: #eee;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    position: relative;
+    cursor: pointer;
+    max-width: 100%;
+    width: fit-content;
+    word-wrap: break-word;
+}
+
+#user-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: 6px;
+    display: none;
+}
+
+#login-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+#login-btn {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    background-color: #4285F4;
+    color: white;
+    border: 0.1rem solid black;
+    border-radius: 4px;
+}
+
+#login-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 100;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    width: max-content;
+    margin-top: 5px;
+}
+
+#login-dropdown.active {
+    display: block !important;
+}
+
+#identity-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: #fff;
+    border: 0.1rem solid black;
+    padding: 10px;
+    z-index: 100;
+    min-width: 250px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+#identity-dropdown.active {
+    display: block;
+}
+
+.identity-email {
+    font-size: clamp(0.7rem, 2vw, 0.9rem);
+    color: #333;
+    word-break: break-all;
+}
+
+#logout-btn {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    background-color: #db4437;
+    color: white;
+    border: 0.1rem solid black;
+    border-radius: 4px;
+    display: none;
+}
+
+/* SSO Provider Buttons */
+.sso-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 10px 16px;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+}
+
+.sso-btn:last-child {
+    margin-bottom: 0;
+}
+
+.sso-btn svg {
+    width: 20px;
+    height: 20px;
+    margin-right: 12px;
+}
+
+.google-btn {
+    background-color: #ffffff;
+    color: #3c4043;
+    border-color: #dadce0;
+}
+
+.google-btn:hover {
+    background-color: #f8f9fa;
+    box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.30), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Layout (Mobile & Tablet)
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    #game-container {
+        flex-direction: column;
+        align-items: center;
+        gap: 2vh;
+    }
+
+    #button-board,
+    #hole-board,
+    #instruction-panel {
+        width: 95%;
+        margin-bottom: 0;
+    }
+
+    #hole-board {
+        gap: 1vh;
+    }
+
+    .sequence-label,
+    .mastermind-label,
+    .check-button,
+    .feedback-column {
+        width: 20%;
+    }
+}

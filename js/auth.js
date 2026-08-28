@@ -120,19 +120,57 @@ function handleAuthError(error) {
 }
 
 /**
- * Binds UI authentication controls (Login button, dropdown, Google button, Logout button, User profile badge)
+ * Centralized Auth Container Template
  */
-export function setupAuthUI({
-    loginBtn,
-    loginDropdown,
-    googleLoginBtn,
-    logoutBtn,
-    userInfoBtn,
-    userDisplayNameEl,
-    userAvatarEl,
-    identityDropdown,
-    identityList
-}) {
+const AUTH_CONTAINER_HTML = `
+    <div id="user-info">
+        <img id="user-avatar" src="" alt="Avatar">
+        <span id="user-display-name"></span>
+        <span style="font-size: 0.8em; margin-left: 5px; flex-shrink: 0;">▼</span>
+        <div id="identity-dropdown">
+            <div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid black; padding-bottom: 5px; white-space: nowrap;">Current Account</div>
+            <div id="identity-list" class="identity-email" style="white-space: nowrap;"></div>
+        </div>
+    </div>
+    <div id="login-wrapper">
+        <button id="login-btn">Sign in</button>
+        <div id="login-dropdown">
+            <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 12px; color: #333; text-align: center;">Sign in with</div>
+            <button id="google-login-btn" class="sso-btn google-btn">
+                <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                    <path fill="none" d="M0 0h48v48H0z"></path>
+                </svg>
+                <span>Google</span>
+            </button>
+        </div>
+    </div>
+    <button id="logout-btn">Sign Out</button>
+`;
+
+/**
+ * Initializes and binds UI authentication controls.
+ * If container is empty, automatically injects the standard Auth markup.
+ */
+export function setupAuthUI(containerId = 'auth-container') {
+    const container = typeof containerId === 'string' ? document.getElementById(containerId) : null;
+    if (container && container.children.length === 0) {
+        container.innerHTML = AUTH_CONTAINER_HTML;
+    }
+
+    const loginBtn = document.getElementById('login-btn');
+    const loginDropdown = document.getElementById('login-dropdown');
+    const googleLoginBtn = document.getElementById('google-login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userInfoBtn = document.getElementById('user-info');
+    const userDisplayNameEl = document.getElementById('user-display-name');
+    const userAvatarEl = document.getElementById('user-avatar');
+    const identityDropdown = document.getElementById('identity-dropdown');
+    const identityList = document.getElementById('identity-list');
+
     // Toggle Login Dropdown
     if (loginBtn && loginDropdown) {
         loginBtn.addEventListener('click', (e) => {
@@ -217,3 +255,4 @@ export function setupAuthUI({
         }
     });
 }
+

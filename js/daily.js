@@ -31,6 +31,8 @@ import {
 } from './storage.js';
 import {
     initNumberToggle,
+    renderNumberToggle,
+    renderDeveloperFooter,
     showToast,
     setupModalListeners,
     openModal,
@@ -40,6 +42,7 @@ import {
 import {
     resetBoard,
     resetAnswerRow,
+    renderColorButtons,
     renderRowGuess,
     renderRowFeedback,
     revealAnswer,
@@ -68,7 +71,10 @@ let isCompleted = false;
 
 export function initDailyMode() {
     setupModalListeners();
-    initNumberToggle('numberToggle');
+    renderNumberToggle('toggle-container');
+    renderDeveloperFooter('developer-footer');
+    setupAuthUI('auth-container');
+    renderColorButtons('color-buttons', selectColor);
 
     // Parse optional URL params (?date=YYYY-MM-DD or ?puzzle=N)
     const params = new URLSearchParams(window.location.search);
@@ -86,26 +92,9 @@ export function initDailyMode() {
         activePuzzleNumber = getPuzzleNumber(activeDateStr);
     }
 
-    // Auth UI
-    setupAuthUI({
-        loginBtn: document.getElementById('login-btn'),
-        loginDropdown: document.getElementById('login-dropdown'),
-        googleLoginBtn: document.getElementById('google-login-btn'),
-        logoutBtn: document.getElementById('logout-btn'),
-        userInfoBtn: document.getElementById('user-info'),
-        userDisplayNameEl: document.getElementById('user-display-name'),
-        userAvatarEl: document.getElementById('user-avatar'),
-        identityDropdown: document.getElementById('identity-dropdown'),
-        identityList: document.getElementById('identity-list')
-    });
-
-    // Colour button listeners
-    document.querySelectorAll('.button-cell').forEach((cell, index) => {
-        cell.onclick = () => selectColor(index);
-    });
-
     const undoBtn = document.getElementById('undo-button');
     if (undoBtn) undoBtn.onclick = () => undoColor();
+
 
     // Nav-bar modal buttons
     const archiveBtn = document.getElementById('open-archive-btn');

@@ -152,3 +152,48 @@ export function getTimeUntilMidnightString() {
 
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
+
+/**
+ * Render the Developer Profile + Ko-fi widget container
+ */
+export function renderDeveloperFooter(containerId = 'developer-footer') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 0.85rem; color: #555;">Developed by <strong>Amit Joshi</strong></span>
+            <a href="https://github.com/amitjoshi2724" target="_blank"
+                style="color: #0366d6; text-decoration: none; font-size: 0.8rem;">GitHub: @amitjoshi2724</a>
+        </div>
+        <div id="kofi-widget-container" style="display: flex; align-items: center;"></div>
+    `;
+
+    // Attempt to load Ko-fi widget if script is available
+    if (window.kofiwidget2) {
+        try {
+            window.kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'I2I81CDN0L');
+            window.kofiwidget2.draw();
+        } catch (e) {
+            console.error('Ko-fi widget error:', e);
+        }
+    }
+}
+
+/**
+ * Render the Number Visibility Toggle switch HTML into a container
+ */
+export function renderNumberToggle(containerId = 'toggle-container') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.innerHTML = `
+        <span>Show Numbers:</span>
+        <label class="switch">
+            <input type="checkbox" id="numberToggle" checked>
+            <span class="slider round"></span>
+        </label>
+    `;
+    initNumberToggle('numberToggle');
+}
+
