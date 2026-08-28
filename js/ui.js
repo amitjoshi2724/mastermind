@@ -160,24 +160,38 @@ export function renderDeveloperFooter(containerId = 'developer-footer') {
     const container = document.getElementById(containerId);
     if (!container) return;
 
+    let kofiHtml = '';
+    if (window.kofiwidget2) {
+        try {
+            window.kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'I2I81CDN0L');
+            kofiHtml = window.kofiwidget2.getHTML();
+        } catch (e) {
+            console.error('Ko-fi widget error:', e);
+        }
+    }
+
+    if (!kofiHtml) {
+        // High-res fallback matching the exact Ko-fi style
+        kofiHtml = `
+            <div class="btn-container">
+                <a title="Support me on ko-fi.com" class="kofi-button" style="box-shadow: 1px 1px 0px rgba(0,0,0,0.2); line-height: 34px !important; min-width: 150px; display: inline-flex !important; align-items: center; justify-content: center; gap: 6px; background-color: #72a4f2; padding: 2px 12px !important; text-align: center !important; border-radius: 7px; color: #fff; cursor: pointer; text-decoration: none; font-family: 'Quicksand', -apple-system, sans-serif !important; font-weight: 700 !important; font-size: 14px !important; transition: opacity 0.2s;" href="https://ko-fi.com/I2I81CDN0L" target="_blank" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+                    <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt="Ko-fi donations" style="height: 15px !important; width: 22px !important; vertical-align: middle;" />
+                    <span style="color: #fff !important; vertical-align: middle;">Support me on Ko-fi</span>
+                </a>
+            </div>
+        `;
+    }
+
     container.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
             <span style="font-size: 0.85rem; color: #555;">Developed by <strong>Amit Joshi</strong></span>
             <a href="https://github.com/amitjoshi2724" target="_blank"
                 style="color: #0366d6; text-decoration: none; font-size: 0.8rem;">GitHub: @amitjoshi2724</a>
         </div>
-        <div id="kofi-widget-container" style="display: flex; align-items: center;"></div>
+        <div id="kofi-widget-container" style="display: flex; align-items: center;">
+            ${kofiHtml}
+        </div>
     `;
-
-    // Attempt to load Ko-fi widget if script is available
-    if (window.kofiwidget2) {
-        try {
-            window.kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'I2I81CDN0L');
-            window.kofiwidget2.draw();
-        } catch (e) {
-            console.error('Ko-fi widget error:', e);
-        }
-    }
 }
 
 /**
