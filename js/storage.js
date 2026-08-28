@@ -114,16 +114,38 @@ function recalculateDailyStatsFromHistory(history, currentStats = {}) {
 }
 
 /**
+ * Normalize a dailyHistory object to ensure all guess rows are number arrays,
+ * regardless of whether they were stored as strings ('6,6,2,2') or arrays ([6,6,2,2]).
+ * This handles corrupt/legacy local storage as well as Firestore-serialized data.
+ */
+function normalizeHistory(history) {
+    const out = {};
+    for (const [date, result] of Object.entries(history || {})) {
+        if (!result) continue;
+        out[date] = {
+            ...result,
+            guesses: (result.guesses || []).map(row => {
+                if (Array.isArray(row)) return row.map(Number);
+                if (typeof row === 'string') return row.split(',').map(Number);
+                return [];
+            })
+        };
+    }
+    return out;
+}
+
+/**
  * Load local storage data for a specific user ID (or guest if null)
  */
 function loadUserLocalState(uid) {
     classicStats = loadFromLocal(getScopedKey('classic_stats', uid), getDefaultClassicStats());
     dailyStats = loadFromLocal(getScopedKey('daily_stats', uid), getDefaultDailyStats());
-    dailyHistory = loadFromLocal(getScopedKey('daily_history', uid), {});
+    // Always normalize when loading from localStorage — handles any corrupt/legacy string guesses
+    dailyHistory = normalizeHistory(loadFromLocal(getScopedKey('daily_history', uid), {}));
     dailyInProgress = loadFromLocal(getScopedKey('daily_in_progress', uid), {});
     settings = loadFromLocal('mastermind_settings', { showNumbers: true });
 
-    // Always ensure guess distribution matches history
+    // Recalculate stats from history to ensure consistency
     if (Object.keys(dailyHistory).length > 0) {
         dailyStats = recalculateDailyStatsFromHistory(dailyHistory, dailyStats);
     }
@@ -253,10 +275,11 @@ function mergeCloudData(cloud, uid = currentSyncedUid) {
         };
     }
 
-    // 2. Merge Daily History (Union of all dates from cloud + local)
-    // Deserialize Firestore guess strings back to arrays
-    const cloudHistory = deserializeDailyHistory(cloud.dailyHistory || {});
-    dailyHistory = { ...cloudHistory, ...dailyHistory };
+    // 2. Merge Daily History: normalize both cloud and local, then union them.
+    // Cloud takes precedence for completed puzzles (local may have corrupt string guesses)
+    const cloudHistory = normalizeHistory(cloud.dailyHistory || {});
+    const localHistory = normalizeHistory(dailyHistory);
+    dailyHistory = { ...localHistory, ...cloudHistory };
 
     // 3. Recalculate Daily Stats and Guess Distribution from complete history
     dailyStats = recalculateDailyStatsFromHistory(dailyHistory, {
