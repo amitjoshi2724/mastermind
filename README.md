@@ -41,12 +41,42 @@ A web implementation of the classic Mastermind codebreaking board game, featurin
 │   ├── auth.js                  # Modular Authentication (Google Sign-In popup, Sign-Out, state listener)
 │   ├── storage.js               # Dual-layer storage (localStorage + real-time Firestore sync)
 │   ├── engine.js                # Core game engine: seeded PRNG, code evaluation, feedback pegs, share text
+│   ├── board.js                 # Shared board renderer: row creation, peg rendering, colour selection DOM
 │   ├── ui.js                    # UI utilities: toast notifications, modals, countdown timer, number toggle
 │   ├── classic.js               # Classic Mode game loop & controller
 │   └── daily.js                 # Daily Mastermindle game loop & archive controller
 ├── firestore.rules              # Firestore security rules for user records & puzzle history
 └── firebase.json                # Firebase configuration
 ```
+
+---
+
+## ☕ Java Version (Original)
+
+The original implementation of this game was built as a **Java Applet / Swing application**.
+
+The Java source files are included in the repository root:
+
+| File | Description |
+| :--- | :--- |
+| `Program.java` | Application entry point |
+| `Applet16.java` | Java Applet wrapper |
+| `UpToYou.java` | Core game logic |
+| `Panel16.java` | Main game panel (Swing) |
+| `HoleBoard16.java` | The peg hole board component |
+| `ButtonBoard16.java` | Colour selection button board |
+| `Scoreboard16.java` | Win/loss scoreboard |
+| `AmitButton.java` | Custom styled button component |
+| `AmitLabel.java` | Custom styled label |
+| `mastermindApplication.jar` | Runnable JAR (application) |
+| `mastermindApplet.jar` | Runnable JAR (applet) |
+
+To run the Java version locally:
+```bash
+java -jar mastermindApplication.jar
+```
+
+
 
 ---
 
