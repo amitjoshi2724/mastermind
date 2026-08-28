@@ -81,8 +81,24 @@
                 </ol>
             </section>
 
-            <!-- Developer Profile & Ko-fi Widget Container -->
-            <div id="developer-footer" style="margin: 15px 0 10px 0; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;"></div>
+            <div style="margin: 15px 0 10px 0; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 0.85rem; color: #555;">Developed by <strong>Amit Joshi</strong></span>
+                    <a href="https://github.com/amitjoshi2724" target="_blank"
+                        style="color: #0366d6; text-decoration: none; font-size: 0.8rem;">GitHub: @amitjoshi2724</a>
+                </div>
+                <div id="kofi-widget-container" style="display: flex; align-items: center;">
+                    <script src="https://storage.ko-fi.com/cdn/widget/Widget_2.js"></script>
+                    <script>
+                        try {
+                            kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'I2I81CDN0L');
+                            kofiwidget2.draw();
+                        } catch (e) {
+                            console.error('Ko-fi widget error:', e);
+                        }
+                    </script>
+                </div>
+            </div>
 
             <!-- Scoreboard -->
             <div id="scoreboard">

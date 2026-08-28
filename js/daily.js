@@ -32,7 +32,6 @@ import {
 import {
     initNumberToggle,
     renderNumberToggle,
-    renderDeveloperFooter,
     showToast,
     setupModalListeners,
     openModal,
@@ -72,7 +71,6 @@ let isCompleted = false;
 export function initDailyMode() {
     setupModalListeners();
     renderNumberToggle('toggle-container');
-    renderDeveloperFooter('developer-footer');
     setupAuthUI('auth-container');
     renderColorButtons('color-buttons', selectColor);
 

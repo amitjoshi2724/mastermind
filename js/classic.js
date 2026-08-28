@@ -7,7 +7,7 @@
 import { COLORS, MAX_ROWS, CODE_LENGTH, generateRandomCode, evaluateGuess } from './engine.js';
 import { setupAuthUI } from './auth.js';
 import { getClassicStats, saveClassicGameResult, onStorageChange } from './storage.js';
-import { renderNumberToggle, renderDeveloperFooter, showToast, setupModalListeners } from './ui.js';
+import { renderNumberToggle, showToast, setupModalListeners } from './ui.js';
 import {
     resetBoard,
     resetAnswerRow,
@@ -28,7 +28,6 @@ let gameActive = true;
 export function initClassicMode() {
     setupModalListeners();
     renderNumberToggle('toggle-container');
-    renderDeveloperFooter('developer-footer');
     setupAuthUI('auth-container');
     renderColorButtons('color-buttons', selectColor);
 
